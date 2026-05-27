@@ -1,0 +1,170 @@
+{
+    "actorSpecification": 1,
+    "fields": {},
+    "views": {
+        "signals": {
+            "title": "All Signals",
+            "description": "Individual signals with NLP enrichment",
+            "transformation": {
+                "fields": [
+                    "company",
+                    "source",
+                    "title",
+                    "url",
+                    "sentiment.label",
+                    "buyingStage",
+                    "buyingSignals.signals",
+                    "personaSignals.jobTitles",
+                    "confidence",
+                    "createdAt"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "company": {
+                        "label": "Company",
+                        "format": "text"
+                    },
+                    "source": {
+                        "label": "Source",
+                        "format": "text"
+                    },
+                    "title": {
+                        "label": "Title",
+                        "format": "text"
+                    },
+                    "url": {
+                        "label": "URL",
+                        "format": "link"
+                    },
+                    "sentiment.label": {
+                        "label": "Sentiment",
+                        "format": "text"
+                    },
+                    "buyingStage": {
+                        "label": "Buying Stage",
+                        "format": "text"
+                    },
+                    "buyingSignals.signals": {
+                        "label": "Buying Signals",
+                        "format": "array"
+                    },
+                    "personaSignals.jobTitles": {
+                        "label": "Personas",
+                        "format": "array"
+                    },
+                    "confidence": {
+                        "label": "Confidence",
+                        "format": "number"
+                    },
+                    "createdAt": {
+                        "label": "Created",
+                        "format": "date"
+                    }
+                }
+            }
+        },
+        "companies": {
+            "title": "Company Aggregates",
+            "description": "Aggregated insights per company",
+            "transformation": {
+                "fields": [
+                    "company",
+                    "totalSignals",
+                    "sources",
+                    "avgSentiment",
+                    "sentimentLabel",
+                    "topBuyingSignals",
+                    "personas",
+                    "competitors",
+                    "signalVelocity"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "company": {
+                        "label": "Company",
+                        "format": "text"
+                    },
+                    "totalSignals": {
+                        "label": "Total Signals",
+                        "format": "number"
+                    },
+                    "sources": {
+                        "label": "Sources",
+                        "format": "array"
+                    },
+                    "avgSentiment": {
+                        "label": "Avg Sentiment",
+                        "format": "number"
+                    },
+                    "sentimentLabel": {
+                        "label": "Sentiment",
+                        "format": "text"
+                    },
+                    "topBuyingSignals": {
+                        "label": "Top Buying Signals",
+                        "format": "array"
+                    },
+                    "personas": {
+                        "label": "Personas Detected",
+                        "format": "array"
+                    },
+                    "competitors": {
+                        "label": "Competitors Mentioned",
+                        "format": "array"
+                    },
+                    "signalVelocity": {
+                        "label": "Velocity (signals/day)",
+                        "format": "text"
+                    }
+                }
+            }
+        },
+        "overview": {
+            "title": "Executive Summary",
+            "description": "High-level overview and alerts",
+            "transformation": {
+                "fields": [
+                    "_type",
+                    "totalCompanies",
+                    "totalSignals",
+                    "avgSignalsPerCompany",
+                    "sentimentBreakdown",
+                    "highPriorityAlerts"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "_type": {
+                        "label": "Type",
+                        "format": "text"
+                    },
+                    "totalCompanies": {
+                        "label": "Companies Analyzed",
+                        "format": "number"
+                    },
+                    "totalSignals": {
+                        "label": "Total Signals",
+                        "format": "number"
+                    },
+                    "avgSignalsPerCompany": {
+                        "label": "Avg Signals/Company",
+                        "format": "text"
+                    },
+                    "sentimentBreakdown": {
+                        "label": "Sentiment Breakdown",
+                        "format": "object"
+                    },
+                    "highPriorityAlerts": {
+                        "label": "High Priority Alerts",
+                        "format": "array"
+                    }
+                }
+            }
+        }
+    }
+}

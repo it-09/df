@@ -1,0 +1,20 @@
+{
+    "companies": [
+        "Notion",
+        "Stripe",
+        "Airbnb"
+    ],
+    "maxRequestsPerCrawl": 30,
+    "sources": {
+        "reddit": true,
+        "github": true,
+        "hackernews": true,
+        "news": false
+    },
+    "knownCompetitors": [
+        "Salesforce",
+        "HubSpot",
+        "Square",
+        "Coda"
+    ]
+}

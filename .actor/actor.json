@@ -1,0 +1,17 @@
+{
+  "actorSpecification": 1,
+  "name": "dark-funnel-scraper",
+  "title": "Dark Funnel Scraper",
+  "description": "Collects Reddit posts and comments mentioning target companies to surface early buying intent signals (Dark Funnel MVP).",
+  "version": "0.0",
+  "meta": {
+    "templateId": "ai-generated-actor",
+    "generatedBy": "claude-3.5-sonnet"
+  },
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "dockerfile": "../Dockerfile"
+}

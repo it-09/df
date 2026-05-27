@@ -1,0 +1,21 @@
+{
+    "name": "dark-funnel-reddit-scraper",
+    "version": "0.0.1",
+    "type": "module",
+    "description": "Dark Funnel Reddit Scraper Actor",
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "dependencies": {
+        "apify": "^3.4.2",
+        "crawlee": "^3.13.8",
+        "he": "^1.2.0",
+        "sentiment": "^5.0.2",
+        "natural": "^6.10.0",
+        "axios": "^1.6.0",
+        "date-fns": "^3.0.0"
+    },
+    "scripts": {
+        "start": "node src/main.js"
+    }
+}

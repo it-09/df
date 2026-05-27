@@ -1,0 +1,75 @@
+Warning: You are not logged in with your Apify Account. Some features like Apify Proxy will not work. Call "apify login" to fix that.
+Run: npm run start
+
+> dark-funnel-reddit-scraper@0.0.1 start
+> node src/main.js
+
+[32mINFO[39m  System info[90m {"apifyVersion":"3.5.2","apifyClientVersion":"2.21.0","crawleeVersion":"3.15.3","osType":"Linux","nodeVersion":"v22.18.0"}[39m
+Starting Dark Funnel Intelligence Engine {
+  companies: [ 'Notion', 'Stripe', 'Airbnb' ],
+  sources: { reddit: true, github: true, hackernews: true, news: false },
+  maxRequests: 30
+}
+Scraping Reddit...
+[32mINFO[39m [33m CheerioCrawler:[39m Starting the crawler.
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"jLN1GTzwo0MwnWe","url":"https://old.reddit.com/search?q=Notion&sort=new","retryCount":1}[39m
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"kMoPhFYdZshxOAy","url":"https://old.reddit.com/search?q=Airbnb&sort=new","retryCount":1}[39m
+[32mINFO[39m [33m CheerioCrawler:[39m Processing Reddit[90m {"url":"https://old.reddit.com/search?q=Stripe&sort=new"}[39m
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"jLN1GTzwo0MwnWe","url":"https://old.reddit.com/search?q=Notion&sort=new","retryCount":2}[39m
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"kMoPhFYdZshxOAy","url":"https://old.reddit.com/search?q=Airbnb&sort=new","retryCount":2}[39m
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"jLN1GTzwo0MwnWe","url":"https://old.reddit.com/search?q=Notion&sort=new","retryCount":3}[39m
+[33mWARN[39m [33m CheerioCrawler:[39m Reclaiming failed request back to the list or queue. Request blocked - received 403 status code.
+[90m {"id":"kMoPhFYdZshxOAy","url":"https://old.reddit.com/search?q=Airbnb&sort=new","retryCount":3}[39m
+[31mERROR[39m[33m CheerioCrawler:[39m Request failed and reached maximum retries. Error: Request blocked - received 403 status code.
+    at CheerioCrawler._throwOnBlockedRequest (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/basic/internals/basic-crawler.js:903:19)
+    at CheerioCrawler._runRequestHandler (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/http/internals/http-crawler.js:324:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async CheerioCrawler._runRequestHandler (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/cheerio/internals/cheerio-crawler.js:153:9)
+    at async wrap (/home/rht/dark-funnel-reddit-scraper/node_modules/@apify/timeout/cjs/index.cjs:54:21)[90m {"id":"jLN1GTzwo0MwnWe","url":"https://old.reddit.com/search?q=Notion&sort=new","method":"GET","uniqueKey":"https://old.reddit.com/search?q=Notion&sort=new"}[39m
+[31mERROR[39m[33m CheerioCrawler:[39m Reddit request failed[90m {"url":"https://old.reddit.com/search?q=Notion&sort=new"}[39m
+[31mERROR[39m[33m CheerioCrawler:[39m Request failed and reached maximum retries. Error: Request blocked - received 403 status code.
+    at CheerioCrawler._throwOnBlockedRequest (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/basic/internals/basic-crawler.js:903:19)
+    at CheerioCrawler._runRequestHandler (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/http/internals/http-crawler.js:324:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async CheerioCrawler._runRequestHandler (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/cheerio/internals/cheerio-crawler.js:153:9)
+    at async wrap (/home/rht/dark-funnel-reddit-scraper/node_modules/@apify/timeout/cjs/index.cjs:54:21)[90m {"id":"kMoPhFYdZshxOAy","url":"https://old.reddit.com/search?q=Airbnb&sort=new","method":"GET","uniqueKey":"https://old.reddit.com/search?q=Airbnb&sort=new"}[39m
+[31mERROR[39m[33m CheerioCrawler:[39m Reddit request failed[90m {"url":"https://old.reddit.com/search?q=Airbnb&sort=new"}[39m
+[32mINFO[39m [33m CheerioCrawler:[39m All requests from the queue have been processed, the crawler will shut down.
+[32mINFO[39m [33m CheerioCrawler:[39m Final request statistics:[90m {"requestsFinished":1,"requestsFailed":2,"retryHistogram":[1,null,null,2],"requestAvgFailedDurationMillis":252,"requestAvgFinishedDurationMillis":1423,"requestsFinishedPerMinute":26,"requestsFailedPerMinute":52,"requestTotalDurationMillis":1927,"requestsTotal":3,"crawlerRuntimeMillis":2301}[39m
+[32mINFO[39m [33m CheerioCrawler:[39m Error analysis:[90m {"totalErrors":2,"uniqueErrors":1,"mostCommonErrors":["2x: Request blocked - received 403 status code. (/home/rht/dark-funnel-reddit-scraper/node_modules/@crawlee/basic/internals/basic-crawler.js:903:19)"]}[39m
+[32mINFO[39m [33m CheerioCrawler:[39m Finished! Total 3 requests: 1 succeeded, 2 failed.[90m {"terminal":true}[39m
+Reddit: 24 signals collected
+Scraping GitHub...
+GitHub: 30 signals collected
+Scraping Hacker News...
+Hacker News: 60 signals collected
+Total raw signals collected: 114
+After deduplication: 113 signals
+Enriching signals with NLP analysis...
+Error during scraping {
+  error: 'wordTokenize is not a function',
+  stack: 'TypeError: wordTokenize is not a function\n' +
+    '    at detectBuyingSignals (file:///home/rht/dark-funnel-reddit-scraper/src/classifiers/intent.js:57:20)\n' +
+    '    at file:///home/rht/dark-funnel-reddit-scraper/src/main.js:102:31\n' +
+    '    at Array.map (<anonymous>)\n' +
+    '    at file:///home/rht/dark-funnel-reddit-scraper/src/main.js:94:40\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)'
+}
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+TypeError: wordTokenize is not a function
+    at detectBuyingSignals (file:///home/rht/dark-funnel-reddit-scraper/src/classifiers/intent.js:57:20)
+    at file:///home/rht/dark-funnel-reddit-scraper/src/main.js:102:31
+    at Array.map (<anonymous>)
+    at file:///home/rht/dark-funnel-reddit-scraper/src/main.js:94:40
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+Node.js v22.18.0
+Error: /home/rht/.nvm/versions/node/v22.18.0/bin/npm exited with code 1

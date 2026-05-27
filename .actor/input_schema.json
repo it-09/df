@@ -1,0 +1,60 @@
+{
+    "title": "Input schema of dark-funnel-reddit-scraper",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "companies": {
+            "title": "Companies to Monitor",
+            "type": "array",
+            "description": "List of company names or queries to search for across all sources.",
+            "editor": "stringList",
+            "items": {
+                "type": "string"
+            },
+            "prefill": [
+                "Notion",
+                "HubSpot",
+                "Stripe"
+            ]
+        },
+        "maxRequestsPerCrawl": {
+            "title": "Max Requests per Crawl",
+            "type": "integer",
+            "description": "Maximum number of pages to visit per run (applies to Reddit scraper).",
+            "editor": "number",
+            "default": 50
+        },
+        "sources": {
+            "title": "Data Sources",
+            "type": "object",
+            "description": "Enable/disable specific data sources.",
+            "editor": "json",
+            "prefill": {
+                "reddit": false,
+                "github": true,
+                "hackernews": true,
+                "news": false
+            }
+        },
+        "newsApiKey": {
+            "title": "News API Key (Optional)",
+            "type": "string",
+            "description": "Get free API key at newsapi.org (required if news source enabled). 100 requests/day on free tier.",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "knownCompetitors": {
+            "title": "Known Competitors (Optional)",
+            "type": "array",
+            "description": "List of competitor names to track in discussions.",
+            "editor": "stringList",
+            "items": {
+                "type": "string"
+            },
+            "prefill": []
+        }
+    },
+    "required": [
+        "companies"
+    ]
+}
