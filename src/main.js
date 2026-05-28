@@ -28,6 +28,20 @@ import { aggregateByCompany, generateExecutiveSummary, generateCompanyExecutiveS
 
 await Actor.init();
 
+// --- DIAGNOSTIC SMOKE TEST BLOCKADE ---
+log.info('--- SURGICAL DIAGNOSTIC MODE ACTIVE ---');
+log.info('Pushing minimal smoke test payload...');
+await Actor.pushData({
+    _type: 'smoke_test',
+    success: true,
+    company: 'HubSpot',
+    timestamp: new Date().toISOString()
+});
+log.info('Smoke test pushed.');
+await Actor.exit();
+process.exit(0);
+// --------------------------------------
+
 const input = (await Actor.getInput()) ?? {};
 
 // --- H2: Support both old sources{} object AND new individual boolean toggles ---
@@ -271,6 +285,7 @@ try {
                     else if (finalScore >= 60) leadPriority = 'HIGH';
                     else leadPriority = 'MEDIUM';
                     whyHighIntent = llmResult.explanation;
+                    signal.intentLevel = finalScore >= 80 ? 'HIGH' : finalScore >= 40 ? 'MEDIUM' : 'LOW';
                     
                     if (llmResult.painPoints.length > 0) {
                         signal.painSignals.hasPainSignal = true;
@@ -290,6 +305,9 @@ try {
                     leadPriority = 'LOW';
                     signal.commercialRelevanceLevel = 'LOW';
                     signal.commercialRelevanceScore = 0;
+                    signal.intentLevel = 'LOW';
+                    signal.buyingStage = 'awareness';
+                    whyHighIntent = 'Rejected by LLM Truth Layer';
                 }
 
                 signal.intentScore = finalScore;
@@ -353,6 +371,11 @@ try {
     const itemsToPush = [];
     
     for (const signal of enrichedSignals) {
+        // Truncate content for payload safety
+        if (signal.content && signal.content.length > 1500) {
+            signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
+        }
+
         itemsToPush.push(signal);
         chargedSignals++;
 
@@ -375,6 +398,8 @@ try {
     }
     
     if (itemsToPush.length > 0) {
+        const payloadSizeKB = (Buffer.byteLength(JSON.stringify(itemsToPush), 'utf8') / 1024).toFixed(2);
+        log.info(`Serialized payload size: ${payloadSizeKB} KB`);
         log.info(`Persisting ${itemsToPush.length} items to dataset...`);
         console.log('Items count:', itemsToPush.length);
         console.log('Sample dataset item:', JSON.stringify(itemsToPush[0], null, 2));
@@ -435,6 +460,8 @@ try {
         ...salesInsights
     });
     
+    const aggregatedPayloadSizeKB = (Buffer.byteLength(JSON.stringify(aggregatedItems), 'utf8') / 1024).toFixed(2);
+    log.info(`Serialized payload size: ${aggregatedPayloadSizeKB} KB`);
     log.info(`Persisting ${aggregatedItems.length} aggregated items to dataset...`);
     console.log('Items count:', aggregatedItems.length);
     console.log('Sample dataset item:', JSON.stringify(aggregatedItems[0], null, 2));
