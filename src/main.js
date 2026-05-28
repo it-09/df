@@ -182,8 +182,8 @@ try {
             topCompanies: [],
             highPriorityAlerts: [],
             generatedAt: new Date().toISOString(),
-        });
         await Actor.exit();
+        return;
     }
 
     // Deduplicate signals
