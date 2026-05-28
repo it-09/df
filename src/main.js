@@ -28,19 +28,27 @@ import { aggregateByCompany, generateExecutiveSummary, generateCompanyExecutiveS
 await Actor.init();
 
 // --- INFRASTRUCTURE DIAGNOSTIC ---
-log.info('--- SURGICAL DIAGNOSTIC MODE ACTIVE ---');
-log.info('Pushing minimal smoke test via Dataset class...');
+log.info('--- SURGICAL DIAGNOSTIC MODE: DIRECT API BYPASS ---');
 
-await Dataset.pushData({
-    smoke: true,
-    timestamp: new Date().toISOString()
-});
+const client = Actor.newClient();
+const env = Actor.getEnv();
+const datasetId = env.defaultDatasetId;
 
-const dataset = await Dataset.open();
-const info = await dataset.getInfo();
-log.info('Dataset info after smoke write:', info);
+log.info(`Pushing minimal smoke test directly to Cloud API for dataset: ${datasetId}`);
 
-log.info('Smoke test pushed.');
+await client.dataset(datasetId).pushItems([
+    {
+        _type: 'direct_api_smoke_test',
+        success: true,
+        company: 'HubSpot',
+        timestamp: new Date().toISOString()
+    }
+]);
+
+const info = await client.dataset(datasetId).get();
+log.info('Dataset info after DIRECT API write:', { itemCount: info.itemCount });
+
+log.info('Direct API Smoke test pushed.');
 await Actor.exit();
 // REMOVED: process.exit(0)
 // --------------------------------------
