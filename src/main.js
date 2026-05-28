@@ -1,4 +1,4 @@
-import { Actor, log } from 'apify';
+import { Actor, Dataset, log } from 'apify';
 
 // Scrapers
 import { scrapeReddit } from './scrapers/reddit.js';
@@ -26,6 +26,22 @@ import { deduplicateSignals, calculateConfidence, cleanText } from './utils/norm
 import { aggregateByCompany, generateExecutiveSummary, generateCompanyExecutiveSummary, identifyHighIntentSignals, generateSalesInsights } from './utils/aggregator.js';
 
 await Actor.init();
+
+log.info('--- DATASET ROUTING FORENSIC AUDIT ---');
+log.info('Default dataset env:', { id: process.env.APIFY_DEFAULT_DATASET_ID });
+log.info('Actor env dataset ID:', { id: Actor.getEnv().defaultDatasetId });
+
+const dataset = await Dataset.open();
+
+log.info('Dataset opened:', {
+    id: dataset.id,
+    name: dataset.name,
+    isLocal: process.env.APIFY_IS_AT_HOME === '1' ? false : true
+});
+
+log.info('Pushing single tracking record via Actor.pushData...');
+await Actor.pushData({ _type: 'routing_audit', timestamp: new Date().toISOString() });
+log.info('--------------------------------------------');
 
 const input = (await Actor.getInput()) ?? {};
 
