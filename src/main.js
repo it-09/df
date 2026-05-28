@@ -350,15 +350,17 @@ try {
 
     // Push individual signals to dataset + charge per signal (H3: PPE)
     let chargedSignals = 0;
+    const itemsToPush = [];
+    
     for (const signal of enrichedSignals) {
-        await Actor.pushData(signal);
+        itemsToPush.push(signal);
         chargedSignals++;
 
         // NEW WAVE 3: Smart Alerts
         if (monitoringMode !== 'off') {
             const alert = generateSmartAlert(signal);
             if (alert) {
-                await Actor.pushData(alert);
+                itemsToPush.push(alert);
             }
         }
 
@@ -370,6 +372,12 @@ try {
                 // Charging may fail if PPE not configured or user on free plan — that's OK
             }
         }
+    }
+    
+    if (itemsToPush.length > 0) {
+        log.info(`Persisting ${itemsToPush.length} items to dataset...`);
+        await Actor.pushData(itemsToPush);
+        log.info('Dataset persistence complete.');
     }
 
     // Generate aggregated insights
@@ -388,7 +396,9 @@ try {
     }
 
     // Push aggregated data
-    await Actor.pushData({
+    const aggregatedItems = [];
+    
+    aggregatedItems.push({
         ...runSummary,
         competitorRisk,
         companyRollup: companySummary
@@ -404,13 +414,13 @@ try {
     }
 
     for (const companyInsight of aggregated) {
-        await Actor.pushData({
+        aggregatedItems.push({
             _type: 'company_aggregate',
             ...companyInsight
         });
     }
 
-    await Actor.pushData({
+    aggregatedItems.push({
         _type: 'high_intent_alerts',
         totalHighIntentSignals: highIntentSignals.length,
         signals: highIntentSignals.slice(0, 20) // Top 20
@@ -418,10 +428,14 @@ try {
 
     // NEW: Sales insights output
     const salesInsights = generateSalesInsights(enrichedSignals, aggregated);
-    await Actor.pushData({
+    aggregatedItems.push({
         _type: 'sales_insights',
         ...salesInsights
     });
+    
+    log.info(`Persisting ${aggregatedItems.length} aggregated items to dataset...`);
+    await Actor.pushData(aggregatedItems);
+    log.info('Dataset persistence complete.');
 
     log.info('Dark Funnel Intelligence Engine completed successfully', {
         totalSignals: enrichedSignals.length,
