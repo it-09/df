@@ -1,5 +1,4 @@
-// Dark Funnel Intelligence Engine - Main Orchestrator
-import { Actor, log } from 'apify';
+import { Actor, Dataset, log } from 'apify';
 
 // Scrapers
 import { scrapeReddit } from './scrapers/reddit.js';
@@ -28,18 +27,22 @@ import { aggregateByCompany, generateExecutiveSummary, generateCompanyExecutiveS
 
 await Actor.init();
 
-// --- DIAGNOSTIC SMOKE TEST BLOCKADE ---
+// --- INFRASTRUCTURE DIAGNOSTIC ---
 log.info('--- SURGICAL DIAGNOSTIC MODE ACTIVE ---');
-log.info('Pushing minimal smoke test payload...');
-await Actor.pushData({
-    _type: 'smoke_test',
-    success: true,
-    company: 'HubSpot',
+log.info('Pushing minimal smoke test via Dataset class...');
+
+await Dataset.pushData({
+    smoke: true,
     timestamp: new Date().toISOString()
 });
+
+const dataset = await Dataset.open();
+const info = await dataset.getInfo();
+log.info('Dataset info after smoke write:', info);
+
 log.info('Smoke test pushed.');
 await Actor.exit();
-process.exit(0);
+// REMOVED: process.exit(0)
 // --------------------------------------
 
 const input = (await Actor.getInput()) ?? {};
