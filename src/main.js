@@ -1,4 +1,4 @@
-import { Actor, Dataset, log } from 'apify';
+import { Actor, log } from 'apify';
 
 // Scrapers
 import { scrapeReddit } from './scrapers/reddit.js';
@@ -26,32 +26,6 @@ import { deduplicateSignals, calculateConfidence, cleanText } from './utils/norm
 import { aggregateByCompany, generateExecutiveSummary, generateCompanyExecutiveSummary, identifyHighIntentSignals, generateSalesInsights } from './utils/aggregator.js';
 
 await Actor.init();
-
-// --- INFRASTRUCTURE DIAGNOSTIC ---
-log.info('--- SURGICAL DIAGNOSTIC MODE: DIRECT API BYPASS ---');
-
-const client = Actor.newClient();
-const env = Actor.getEnv();
-const datasetId = env.defaultDatasetId;
-
-log.info(`Pushing minimal smoke test directly to Cloud API for dataset: ${datasetId}`);
-
-await client.dataset(datasetId).pushItems([
-    {
-        _type: 'direct_api_smoke_test',
-        success: true,
-        company: 'HubSpot',
-        timestamp: new Date().toISOString()
-    }
-]);
-
-const info = await client.dataset(datasetId).get();
-log.info('Dataset info after DIRECT API write:', { itemCount: info.itemCount });
-
-log.info('Direct API Smoke test pushed.');
-await Actor.exit();
-// REMOVED: process.exit(0)
-// --------------------------------------
 
 const input = (await Actor.getInput()) ?? {};
 
