@@ -184,7 +184,7 @@ try {
             generatedAt: new Date().toISOString(),
         });
         await Actor.exit();
-        return;
+        process.exit(0);
     }
 
     // Deduplicate signals
