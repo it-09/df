@@ -376,6 +376,8 @@ try {
     
     if (itemsToPush.length > 0) {
         log.info(`Persisting ${itemsToPush.length} items to dataset...`);
+        console.log('Items count:', itemsToPush.length);
+        console.log('Sample dataset item:', JSON.stringify(itemsToPush[0], null, 2));
         await Actor.pushData(itemsToPush);
         log.info('Dataset persistence complete.');
     }
@@ -434,6 +436,8 @@ try {
     });
     
     log.info(`Persisting ${aggregatedItems.length} aggregated items to dataset...`);
+    console.log('Items count:', aggregatedItems.length);
+    console.log('Sample dataset item:', JSON.stringify(aggregatedItems[0], null, 2));
     await Actor.pushData(aggregatedItems);
     log.info('Dataset persistence complete.');
 

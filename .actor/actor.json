@@ -9,8 +9,5 @@
   "categories": ["lead_generation", "marketing", "business", "seo_tools"],
   "input": "./input_schema.json",
   "output": "./output_schema.json",
-  "storages": {
-    "dataset": "./dataset_schema.json"
-  },
   "dockerfile": "../Dockerfile"
 }
