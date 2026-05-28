@@ -1,11 +1,31 @@
 {
     "actorOutputSchemaVersion": 1,
-    "title": "Output schema of dark-funnel-reddit-scraper",
+    "title": "Dark Funnel Scraper",
     "properties": {
         "overview": {
             "type": "string",
-            "title": "Overview",
+            "title": "Executive Summary",
             "template": "{{links.apiDefaultDatasetUrl}}/items?view=overview"
+        },
+        "companies": {
+            "type": "string",
+            "title": "Company Aggregates",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=companies"
+        },
+        "signals": {
+            "type": "string",
+            "title": "All Signals",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=signals"
+        },
+        "leads": {
+            "type": "string",
+            "title": "Sales Leads",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=leads"
+        },
+        "salesInsights": {
+            "type": "string",
+            "title": "Sales Insights",
+            "template": "{{links.apiDefaultDatasetUrl}}/items?view=salesInsights"
         }
     }
 }

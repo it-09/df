@@ -1,19 +1,18 @@
 {
-    "name": "dark-funnel-reddit-scraper",
-    "version": "0.0.1",
+    "name": "dark-funnel-intelligence-engine",
+    "version": "1.0.0",
     "type": "module",
-    "description": "Dark Funnel Reddit Scraper Actor",
+    "description": "B2B Buying Intent Signal Tracker — surface dark funnel signals from Reddit, GitHub, Hacker News, and News.",
     "engines": {
         "node": ">=20.0.0"
     },
     "dependencies": {
         "apify": "^3.4.2",
+        "axios": "^1.6.0",
+        "cheerio": "^1.2.0",
         "crawlee": "^3.13.8",
         "he": "^1.2.0",
-        "sentiment": "^5.0.2",
-        "natural": "^6.10.0",
-        "axios": "^1.6.0",
-        "date-fns": "^3.0.0"
+        "sentiment": "^5.0.2"
     },
     "scripts": {
         "start": "node src/main.js"

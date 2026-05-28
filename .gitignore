@@ -1,0 +1,12 @@
+node_modules/
+storage/
+.env
+.env.local
+.apify_storage/
+scratch/
+tmp/
+logs/
+*.log
+coverage/
+dist/
+input.json

@@ -1,12 +1,32 @@
 {
-    "title": "Input schema of dark-funnel-reddit-scraper",
+    "title": "Dark Funnel Scraper",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
+        "templatePreset": {
+            "title": "Use-Case Template",
+            "type": "string",
+            "description": "Select a pre-configured template to automatically fill companies (overrides manual input).",
+            "default": "custom",
+            "enum": [
+                "custom",
+                "crm_switching",
+                "payment_processor",
+                "devops_hosting",
+                "marketing_agency"
+            ],
+            "enumTitles": [
+                "Custom (Use manual input below)",
+                "CRM Competitor Switching (HubSpot, Salesforce, Pipedrive)",
+                "Payment Processor Switching (Stripe, Adyen, PayPal)",
+                "DevOps / Hosting Migration (Vercel, Netlify, Cloudflare)",
+                "Marketing Agency Dissatisfaction (SEO agency, marketing agency)"
+            ]
+        },
         "companies": {
             "title": "Companies to Monitor",
             "type": "array",
-            "description": "List of company names or queries to search for across all sources.",
+            "description": "List of company or product names to search for across all enabled sources. Example: Notion, Stripe, Airbnb.",
             "editor": "stringList",
             "items": {
                 "type": "string"
@@ -17,41 +37,96 @@
                 "Stripe"
             ]
         },
-        "maxRequestsPerCrawl": {
-            "title": "Max Requests per Crawl",
-            "type": "integer",
-            "description": "Maximum number of pages to visit per run (applies to Reddit scraper).",
-            "editor": "number",
-            "default": 50
+        "competitorWatch": {
+            "title": "Competitor Watch (Monitor Mode)",
+            "type": "array",
+            "description": "Enter specific competitors you want to track for risk spikes over time.",
+            "editor": "stringList",
+            "prefill": ["HubSpot"]
         },
-        "sources": {
-            "title": "Data Sources",
-            "type": "object",
-            "description": "Enable/disable specific data sources.",
-            "editor": "json",
-            "prefill": {
-                "reddit": false,
-                "github": true,
-                "hackernews": true,
-                "news": false
-            }
+        "monitoringMode": {
+            "title": "Monitoring Mode",
+            "type": "string",
+            "description": "Run continuously? OFF = one-time scrape. DAILY/WEEKLY = tracks deltas across runs, prevents duplicate leads, generates smart alerts.",
+            "default": "off",
+            "enum": ["off", "daily", "weekly"],
+            "enumTitles": ["OFF (One-Time Run)", "DAILY (Track Deltas)", "WEEKLY (Track Deltas)"]
+        },
+        "openaiApiKey": {
+            "title": "OpenAI API Key (Required for LLM Evaluation)",
+            "type": "string",
+            "description": "API Key for OpenAI. Used to evaluate signals for genuine buying intent and eliminate false positives.",
+            "editor": "textfield",
+            "isSecret": true,
+            "sectionCaption": "AI Engine (Required)",
+            "sectionDescription": "The LLM evaluator is required to prevent false positives and accurately score intent."
+        },
+        "maxRequestsPerCrawl": {
+            "title": "Max Results per Company",
+            "type": "integer",
+            "description": "Maximum number of results to fetch per company per source. Lower values = faster runs and lower cost. Default: 10.",
+            "editor": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100,
+            "sectionCaption": "Performance",
+            "sectionDescription": "Control speed and cost of each run."
+        },
+        "enableReddit": {
+            "title": "Enable Reddit",
+            "type": "boolean",
+            "description": "Scrape Reddit posts via Apify actor chaining (uses boneswill/reddit-scraper). Requires UNRESTRICTED Actor permissions on Apify platform. Adds ~$0.01-0.05 per company to run cost.",
+            "default": false,
+            "sectionCaption": "Data Sources",
+            "sectionDescription": "Choose which sources to scan. GitHub and Hacker News are free and reliable — recommended for first runs."
+        },
+        "enableGithub": {
+            "title": "Enable GitHub",
+            "type": "boolean",
+            "description": "Search GitHub Issues for company mentions via the public API. Free, no API key needed. Rate limit: 60 requests/hour.",
+            "default": true
+        },
+        "enableHackernews": {
+            "title": "Enable Hacker News",
+            "type": "boolean",
+            "description": "Search Hacker News stories and comments via the free Algolia API. No API key needed, no rate limit.",
+            "default": true
+        },
+        "enableNews": {
+            "title": "Enable News API",
+            "type": "boolean",
+            "description": "Search news articles via NewsAPI.org. Requires a free API key (100 requests/day). Get one at https://newsapi.org.",
+            "default": false
+        },
+        "enableG2": {
+            "title": "Enable G2 Reviews",
+            "type": "boolean",
+            "description": "Scrape highly commercial G2 Reviews via Google Dorking to bypass Cloudflare. (Recommended)",
+            "default": true
         },
         "newsApiKey": {
-            "title": "News API Key (Optional)",
+            "title": "News API Key",
             "type": "string",
-            "description": "Get free API key at newsapi.org (required if news source enabled). 100 requests/day on free tier.",
+            "description": "Your NewsAPI.org API key. Required only if 'Enable News API' is checked. Free tier: 100 requests/day.",
             "editor": "textfield",
-            "isSecret": true
+            "isSecret": true,
+            "sectionCaption": "API Keys",
+            "sectionDescription": "Optional API keys for additional data sources."
         },
         "knownCompetitors": {
-            "title": "Known Competitors (Optional)",
+            "title": "Known Competitors",
             "type": "array",
-            "description": "List of competitor names to track in discussions.",
+            "description": "Optional list of competitor names to detect in discussions. Helps identify switching signals and competitive threats.",
             "editor": "stringList",
             "items": {
                 "type": "string"
             },
-            "prefill": []
+            "prefill": [
+                "Salesforce",
+                "HubSpot"
+            ],
+            "sectionCaption": "Competitive Intelligence",
+            "sectionDescription": "Track competitor mentions alongside your target companies."
         }
     },
     "required": [

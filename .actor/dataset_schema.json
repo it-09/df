@@ -16,6 +16,18 @@
                     "buyingSignals.signals",
                     "personaSignals.jobTitles",
                     "confidence",
+                    "commercialRelevanceLevel",
+                    "commercialRelevanceScore",
+                    "leadPriority",
+                    "estimatedICPFit",
+                    "intentScore",
+                    "crmReady.leadReason",
+                    "crmReady.recommendedOwner",
+                    "crmReady.followupPriority",
+                    "whyHighIntent",
+                    "recommendedOutreachAngle",
+                    "painSignals.painTypes",
+                    "companyEnrichment.industry",
                     "createdAt"
                 ]
             },
@@ -58,6 +70,54 @@
                         "label": "Confidence",
                         "format": "number"
                     },
+                    "commercialRelevanceLevel": {
+                        "label": "Relevance",
+                        "format": "text"
+                    },
+                    "commercialRelevanceScore": {
+                        "label": "Relevance Score",
+                        "format": "number"
+                    },
+                    "leadPriority": {
+                        "label": "Lead Priority",
+                        "format": "text"
+                    },
+                    "estimatedICPFit": {
+                        "label": "ICP Fit",
+                        "format": "text"
+                    },
+                    "intentScore": {
+                        "label": "Intent Score",
+                        "format": "number"
+                    },
+                    "crmReady.leadReason": {
+                        "label": "CRM Lead Reason",
+                        "format": "text"
+                    },
+                    "crmReady.recommendedOwner": {
+                        "label": "CRM Owner",
+                        "format": "text"
+                    },
+                    "crmReady.followupPriority": {
+                        "label": "CRM Followup",
+                        "format": "text"
+                    },
+                    "whyHighIntent": {
+                        "label": "Explainability",
+                        "format": "array"
+                    },
+                    "recommendedOutreachAngle": {
+                        "label": "Outreach Angle",
+                        "format": "text"
+                    },
+                    "painSignals.painTypes": {
+                        "label": "Pain Types",
+                        "format": "array"
+                    },
+                    "companyEnrichment.industry": {
+                        "label": "Industry",
+                        "format": "text"
+                    },
                     "createdAt": {
                         "label": "Created",
                         "format": "date"
@@ -78,6 +138,10 @@
                     "topBuyingSignals",
                     "personas",
                     "competitors",
+                    "painTypes",
+                    "switchingSignals",
+                    "avgIntentScore",
+                    "highestPriority",
                     "signalVelocity"
                 ]
             },
@@ -115,6 +179,22 @@
                     "competitors": {
                         "label": "Competitors Mentioned",
                         "format": "array"
+                    },
+                    "painTypes": {
+                        "label": "Pain Types",
+                        "format": "array"
+                    },
+                    "switchingSignals": {
+                        "label": "Switching Signals",
+                        "format": "number"
+                    },
+                    "avgIntentScore": {
+                        "label": "Avg Intent Score",
+                        "format": "number"
+                    },
+                    "highestPriority": {
+                        "label": "Highest Priority",
+                        "format": "text"
                     },
                     "signalVelocity": {
                         "label": "Velocity (signals/day)",
@@ -163,6 +243,78 @@
                         "label": "High Priority Alerts",
                         "format": "array"
                     }
+                }
+            }
+        },
+        "leads": {
+            "title": "Sales Leads",
+            "description": "High intent leads prioritized for sales outreach",
+            "transformation": {
+                "fields": [
+                    "company",
+                    "leadPriority",
+                    "isNew",
+                    "estimatedICPFit",
+                    "commercialRelevanceLevel",
+                    "intentScore",
+                    "crmReady.leadReason",
+                    "crmReady.recommendedOwner",
+                    "crmReady.followupPriority",
+                    "whyHighIntent",
+                    "recommendedOutreachAngle",
+                    "intentLevel",
+                    "painSignals.painTypes",
+                    "switchSignals.switchingFrom",
+                    "switchSignals.switchingTo",
+                    "companyEnrichment.industry",
+                    "buyingStage",
+                    "title",
+                    "url"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "company": { "label": "Company", "format": "text" },
+                    "leadPriority": { "label": "Priority", "format": "text" },
+                    "isNew": { "label": "New Lead", "format": "boolean" },
+                    "estimatedICPFit": { "label": "ICP Fit", "format": "text" },
+                    "commercialRelevanceLevel": { "label": "Relevance", "format": "text" },
+                    "intentScore": { "label": "Intent Score", "format": "number" },
+                    "crmReady.leadReason": { "label": "CRM Lead Reason", "format": "text" },
+                    "crmReady.recommendedOwner": { "label": "CRM Owner", "format": "text" },
+                    "crmReady.followupPriority": { "label": "CRM Followup", "format": "text" },
+                    "whyHighIntent": { "label": "Explainability", "format": "array" },
+                    "recommendedOutreachAngle": { "label": "Outreach Angle", "format": "text" },
+                    "intentLevel": { "label": "Intent Level", "format": "text" },
+                    "painSignals.painTypes": { "label": "Pain Points", "format": "array" },
+                    "switchSignals.switchingFrom": { "label": "Switching From", "format": "text" },
+                    "switchSignals.switchingTo": { "label": "Switching To", "format": "text" },
+                    "companyEnrichment.industry": { "label": "Industry", "format": "text" },
+                    "buyingStage": { "label": "Stage", "format": "text" },
+                    "title": { "label": "Discussion", "format": "text" },
+                    "url": { "label": "Link", "format": "link" }
+                }
+            }
+        },
+        "salesInsights": {
+            "title": "Sales Insights",
+            "description": "Executive summary of top sales opportunities",
+            "transformation": {
+                "fields": [
+                    "_type",
+                    "totalOpportunities",
+                    "topOpportunities",
+                    "generatedAt"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "_type": { "label": "Type", "format": "text" },
+                    "totalOpportunities": { "label": "Total Opps", "format": "number" },
+                    "topOpportunities": { "label": "Top Opportunities", "format": "array" },
+                    "generatedAt": { "label": "Generated At", "format": "date" }
                 }
             }
         }

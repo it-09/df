@@ -1,13 +1,12 @@
 {
   "actorSpecification": 1,
-  "name": "dark-funnel-scraper",
-  "title": "Dark Funnel Scraper",
-  "description": "Collects Reddit posts and comments mentioning target companies to surface early buying intent signals (Dark Funnel MVP).",
-  "version": "0.0",
-  "meta": {
-    "templateId": "ai-generated-actor",
-    "generatedBy": "claude-3.5-sonnet"
-  },
+  "name": "dark-funnel-intelligence-engine",
+  "title": "Dark Funnel Intelligence Engine | B2B Buyer Intent & Competitor Tracking",
+  "description": "Enterprise-grade B2B intent data platform. Monitor Reddit, G2, Hacker News, and GitHub for hidden buying signals, competitor dissatisfaction, and CRM-ready leads.",
+  "version": "1.0.0",
+  "seoTitle": "Dark Funnel Intelligence Engine | B2B Buyer Intent & Competitor Tracking",
+  "seoDescription": "Discover hidden B2B buying intent in the Dark Funnel. Extract CRM-ready leads, detect competitor switching, and prioritize outreach with our Hybrid AI intelligence engine.",
+  "categories": ["lead_generation", "marketing", "business", "seo_tools"],
   "input": "./input_schema.json",
   "output": "./output_schema.json",
   "storages": {
