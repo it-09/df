@@ -18,14 +18,17 @@ const TECHNICAL_KEYWORDS = [
     'integration', 'api', 'sdk', 'plugin', 'connector', 'webhook', 'oauth',
     'security', 'compliance', 'gdpr', 'hipaa', 'soc2', 'iso',
     'performance', 'scalability', 'uptime', 'sla', 'latency',
-    'migration', 'onboarding', 'implementation', 'setup', 'technical blockers', 'implementation pain'
+    'migration', 'onboarding', 'implementation', 'setup', 
+    'api limitations', 'rate limits', 'integration pain', 'scaling problems',
+    'developer complaints', 'workflow blockers', 'technical blockers', 'implementation pain'
 ];
 
 const EVALUATION_KEYWORDS = [
     'alternative', 'comparison', 'vs', 'versus', 'better than', 'worse than',
     'switch from', 'migrate from', 'replacing', 'evaluation', 'considering',
     'trial', 'demo', 'poc', 'proof of concept', 'testing', 'trying out',
-    'evaluating alternatives', 'looking for alternatives', 'any better option', 'replacing tool'
+    'evaluating alternatives', 'looking for alternatives', 'any better option', 'replacing tool',
+    'compared to', 'alternatives', 'evaluating'
 ];
 
 const DECISION_KEYWORDS = [
@@ -35,6 +38,7 @@ const DECISION_KEYWORDS = [
 ];
 
 const FRUSTRATION_KEYWORDS = [
+    'fed up', 'terrible', 'frustrated', 'painful', 'awful', 'broken', 'unusable',
     'frustration', 'fed up with', 'moving away from', 'terrible support',
     'churn', 'canceling', 'cancelling'
 ];
@@ -44,7 +48,9 @@ const NOISE_KEYWORDS = [
     'funding round', 'raised series', 'announces acquisition', 'acquired by',
     'culture code', 'press release', 'honored to be recognized',
     'excited to announce', 'proud to share', 'great place to work', 'news announcement',
-    'did y', 'did x', 'generic praise' // Some literal representations of user prompt
+    'did y', 'did x', 'generic praise',
+    'philosophical commentary', 'culture discussion', 'executive reflections',
+    'historical discussion', 'non-commercial discussion'
 ];
 
 /**
@@ -156,7 +162,7 @@ export function detectCompetitors(text, knownCompetitors = []) {
     }
 
     // Also look for generic competitive signals
-    const competitiveKeywords = ['alternative', 'competitor', 'vs', 'versus', 'better than', 'switch from', 'comparison against'];
+    const competitiveKeywords = ['alternative', 'competitor', 'vs', 'versus', 'better than', 'switch from', 'comparison against', 'compared to', 'evaluating alternatives', 'replacing'];
     const hasCompetitiveLanguage = competitiveKeywords.some(kw => lowerText.includes(kw));
 
     return {

@@ -3,10 +3,12 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
 
     if (signals.buyingSignals?.hasEvaluationSignal) score += 20;
     if (signals.buyingSignals?.hasDecisionSignal) score += 30;
+    if (signals.buyingSignals?.hasFrustrationSignal) score += 30;
     
     if (signals.painSignals?.hasPainSignal) score += (signals.painSignals.severity * 20);
     
     if (signals.switchSignals?.switchingDetected) score += 30;
+    if (signals.competitorSignals?.hasCompetitiveSignal) score += 20;
     
     if (signals.personaSignals?.isDecisionMaker) score += 20;
     else if (signals.personaSignals?.jobTitles?.length > 0) score += 10;
@@ -51,6 +53,11 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
 
     // Ensure score doesn't drop below 0
     score = Math.max(0, score);
+    
+    const hasTechnicalPain = signals.buyingSignals?.hasTechnicalSignal;
+    if (signals.buyingSignals?.hasFrustrationSignal && signals.competitorSignals?.hasCompetitiveSignal && hasTechnicalPain) {
+        score = Math.max(score, 75);
+    }
 
     return {
         intentScore: Math.min(100, score),

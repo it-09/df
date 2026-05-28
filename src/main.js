@@ -278,12 +278,23 @@ try {
         );
 
         const { intentScore, intentLevel } = calculateIntentScore({
-            buyingSignals, sentiment, personaSignals, painSignals, switchSignals, buyingStage
+            buyingSignals, sentiment, personaSignals, painSignals, switchSignals, buyingStage, competitorSignals
         }, signal.source, signal.subreddit, daysOld, noiseData.isNoise);
 
         let rejectionReason = '';
+        const hasCommercialPainOrIntent = 
+            buyingSignals.hasFrustrationSignal || 
+            buyingSignals.hasEvaluationSignal || 
+            switchSignals.switchingDetected || 
+            buyingSignals.hasBudgetSignal || 
+            buyingSignals.hasTechnicalSignal || 
+            buyingSignals.hasDecisionSignal || 
+            competitorSignals.hasCompetitiveSignal;
+
         if (noiseData.isNoise) {
             rejectionReason = noiseData.reason;
+        } else if (!hasCommercialPainOrIntent) {
+            rejectionReason = `Generic mention lacking commercial or pain indicators`;
         } else if (daysOld > 90 && !switchSignals.switchingDetected && !buyingSignals.hasFrustrationSignal && !buyingSignals.hasEvaluationSignal) {
             rejectionReason = `Content is too old (${daysOld} days) and lacks explicit switching/evaluation intent`;
         }
