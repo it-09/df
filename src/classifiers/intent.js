@@ -4,7 +4,7 @@
 const BUDGET_KEYWORDS = [
     'pricing', 'price', 'cost', 'budget', 'expensive', 'cheap', 'affordable',
     'roi', 'return on investment', 'worth it', 'pricing tier', 'subscription',
-    'free tier', 'enterprise pricing', 'discount', 'license', 'pay'
+    'free tier', 'enterprise pricing', 'discount', 'license', 'pay', 'pricing complaints'
 ];
 
 const TIMELINE_KEYWORDS = [
@@ -18,20 +18,52 @@ const TECHNICAL_KEYWORDS = [
     'integration', 'api', 'sdk', 'plugin', 'connector', 'webhook', 'oauth',
     'security', 'compliance', 'gdpr', 'hipaa', 'soc2', 'iso',
     'performance', 'scalability', 'uptime', 'sla', 'latency',
-    'migration', 'onboarding', 'implementation', 'setup'
+    'migration', 'onboarding', 'implementation', 'setup', 'technical blockers', 'implementation pain'
 ];
 
 const EVALUATION_KEYWORDS = [
     'alternative', 'comparison', 'vs', 'versus', 'better than', 'worse than',
     'switch from', 'migrate from', 'replacing', 'evaluation', 'considering',
-    'trial', 'demo', 'poc', 'proof of concept', 'testing', 'trying out'
+    'trial', 'demo', 'poc', 'proof of concept', 'testing', 'trying out',
+    'evaluating alternatives', 'looking for alternatives', 'any better option', 'replacing tool'
 ];
 
 const DECISION_KEYWORDS = [
     'decision', 'approve', 'buy', 'purchase', 'contract', 'agreement',
     'stakeholder', 'team', 'manager', 'cto', 'cfo', 'vp', 'director',
-    'recommendation', 'suggest', 'proposal'
+    'recommendation', 'suggest', 'proposal', 'procurement'
 ];
+
+const FRUSTRATION_KEYWORDS = [
+    'frustration', 'fed up with', 'moving away from', 'terrible support',
+    'churn', 'canceling', 'cancelling'
+];
+
+const NOISE_KEYWORDS = [
+    'is hiring', 'we are hiring', 'join our team', 'files for ipo', 'going public',
+    'funding round', 'raised series', 'announces acquisition', 'acquired by',
+    'culture code', 'press release', 'honored to be recognized',
+    'excited to announce', 'proud to share', 'great place to work', 'news announcement',
+    'did y', 'did x', 'generic praise' // Some literal representations of user prompt
+];
+
+/**
+ * Detect noise in text (hiring, IPO, PR, etc)
+ * @param {string} text - Text to analyze
+ * @returns {Object} - Noise detection result
+ */
+export function detectNoise(text) {
+    if (!text) return { isNoise: false, reason: null };
+    const lowerText = text.toLowerCase();
+    
+    for (const kw of NOISE_KEYWORDS) {
+        if (lowerText.includes(kw)) {
+            return { isNoise: true, reason: `Matches noise pattern: "${kw}"` };
+        }
+    }
+    
+    return { isNoise: false, reason: null };
+}
 
 /**
  * Detect buying signals in text
@@ -46,6 +78,7 @@ export function detectBuyingSignals(text) {
             hasTechnicalSignal: false,
             hasEvaluationSignal: false,
             hasDecisionSignal: false,
+            hasFrustrationSignal: false,
             confidence: 0,
             signals: []
         };
@@ -56,39 +89,40 @@ export function detectBuyingSignals(text) {
     const signals = [];
     let score = 0;
 
-    // Check for budget signals
     const hasBudgetSignal = BUDGET_KEYWORDS.some(kw => lowerText.includes(kw));
     if (hasBudgetSignal) {
         signals.push('budget');
         score += 0.2;
     }
 
-    // Check for timeline signals
     const hasTimelineSignal = TIMELINE_KEYWORDS.some(kw => lowerText.includes(kw));
     if (hasTimelineSignal) {
         signals.push('timeline');
         score += 0.25;
     }
 
-    // Check for technical signals
     const hasTechnicalSignal = TECHNICAL_KEYWORDS.some(kw => lowerText.includes(kw));
     if (hasTechnicalSignal) {
         signals.push('technical');
         score += 0.15;
     }
 
-    // Check for evaluation signals
     const hasEvaluationSignal = EVALUATION_KEYWORDS.some(kw => lowerText.includes(kw));
     if (hasEvaluationSignal) {
         signals.push('evaluation');
         score += 0.3;
     }
 
-    // Check for decision signals
     const hasDecisionSignal = DECISION_KEYWORDS.some(kw => lowerText.includes(kw));
     if (hasDecisionSignal) {
         signals.push('decision');
         score += 0.2;
+    }
+
+    const hasFrustrationSignal = FRUSTRATION_KEYWORDS.some(kw => lowerText.includes(kw));
+    if (hasFrustrationSignal) {
+        signals.push('frustration');
+        score += 0.3;
     }
 
     return {
@@ -97,6 +131,7 @@ export function detectBuyingSignals(text) {
         hasTechnicalSignal,
         hasEvaluationSignal,
         hasDecisionSignal,
+        hasFrustrationSignal,
         confidence: Math.min(1.0, score),
         signals
     };
@@ -121,7 +156,7 @@ export function detectCompetitors(text, knownCompetitors = []) {
     }
 
     // Also look for generic competitive signals
-    const competitiveKeywords = ['alternative', 'competitor', 'vs', 'versus', 'better than', 'switch from'];
+    const competitiveKeywords = ['alternative', 'competitor', 'vs', 'versus', 'better than', 'switch from', 'comparison against'];
     const hasCompetitiveLanguage = competitiveKeywords.some(kw => lowerText.includes(kw));
 
     return {
@@ -137,23 +172,19 @@ export function detectCompetitors(text, knownCompetitors = []) {
  * @returns {string} - Predicted stage
  */
 export function predictBuyingStage(buyingSignals, sentimentData) {
-    const { hasBudgetSignal, hasTimelineSignal, hasEvaluationSignal, hasDecisionSignal } = buyingSignals;
+    const { hasBudgetSignal, hasTimelineSignal, hasEvaluationSignal, hasDecisionSignal, hasFrustrationSignal } = buyingSignals;
 
-    // Decision stage: timeline + budget + decision keywords
     if (hasTimelineSignal && hasBudgetSignal && hasDecisionSignal) {
         return 'decision';
     }
 
-    // Evaluation stage: evaluation keywords + technical or budget
-    if (hasEvaluationSignal && (hasBudgetSignal || buyingSignals.hasTechnicalSignal)) {
+    if (hasEvaluationSignal && (hasBudgetSignal || buyingSignals.hasTechnicalSignal || hasFrustrationSignal)) {
         return 'evaluation';
     }
 
-    // Consideration stage: evaluation signals present
-    if (hasEvaluationSignal) {
+    if (hasEvaluationSignal || hasFrustrationSignal) {
         return 'consideration';
     }
 
-    // Awareness stage: just researching
     return 'awareness';
 }

@@ -1,4 +1,4 @@
-export function calculateIntentScore(signals, sourceName = 'unknown', subreddit = '') {
+export function calculateIntentScore(signals, sourceName = 'unknown', subreddit = '', daysOld = 0, isNoise = false) {
     let score = 10; // base
 
     if (signals.buyingSignals?.hasEvaluationSignal) score += 20;
@@ -35,6 +35,22 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
     }
     
     score = Math.round(score * multiplier);
+
+    // Apply Penalties
+    if (isNoise) {
+        score -= 50; // Heavy penalty for noise
+    }
+
+    if (daysOld > 90) {
+        score -= 30; // Heavy penalty for very old content
+    } else if (daysOld > 30) {
+        score -= 10;
+    } else if (daysOld <= 7) {
+        score += 15; // Freshness boost
+    }
+
+    // Ensure score doesn't drop below 0
+    score = Math.max(0, score);
 
     return {
         intentScore: Math.min(100, score),

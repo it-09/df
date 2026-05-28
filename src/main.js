@@ -9,7 +9,7 @@ import { scrapeG2 } from './scrapers/g2.js';
 
 // Classifiers
 import { analyzeSentiment, analyzeAspectSentiment } from './classifiers/sentiment.js';
-import { detectBuyingSignals, detectCompetitors, predictBuyingStage } from './classifiers/intent.js';
+import { detectBuyingSignals, detectCompetitors, predictBuyingStage, detectNoise } from './classifiers/intent.js';
 import { extractPersona, isDecisionMaker, scorePersonaInfluence } from './classifiers/persona.js';
 import { detectPainSignals } from './classifiers/pain.js';
 import { detectSwitchingSignals } from './classifiers/switching.js';
@@ -261,6 +261,10 @@ try {
         const fullText = `${signal.title || ''} ${signal.content || ''}`;
         const cleanedText = cleanText(fullText);
 
+        const signalDate = signal.createdAt ? new Date(signal.createdAt) : new Date();
+        const daysOld = Math.max(0, Math.floor((new Date() - signalDate) / (1000 * 60 * 60 * 24)));
+        const noiseData = detectNoise(cleanedText);
+
         const sentiment = analyzeAspectSentiment(cleanedText, signal.company, knownCompetitors);
         const buyingSignals = detectBuyingSignals(cleanedText);
         const competitorSignals = detectCompetitors(cleanedText, knownCompetitors);
@@ -275,7 +279,19 @@ try {
 
         const { intentScore, intentLevel } = calculateIntentScore({
             buyingSignals, sentiment, personaSignals, painSignals, switchSignals, buyingStage
-        }, signal.source, signal.subreddit);
+        }, signal.source, signal.subreddit, daysOld, noiseData.isNoise);
+
+        let rejectionReason = '';
+        if (noiseData.isNoise) {
+            rejectionReason = noiseData.reason;
+        } else if (daysOld > 90 && !switchSignals.switchingDetected && !buyingSignals.hasFrustrationSignal && !buyingSignals.hasEvaluationSignal) {
+            rejectionReason = `Content is too old (${daysOld} days) and lacks explicit switching/evaluation intent`;
+        }
+
+        let signalQuality = intentScore >= 60 ? 'HIGH' : (intentScore >= 30 ? 'MEDIUM' : 'LOW');
+        if (rejectionReason) {
+            signalQuality = 'REJECT';
+        }
 
         const leadPriority = calculateLeadPriority({
             intentScore, painSignals, switchSignals, personaSignals, buyingSignals, competitorSignals, buyingStage, commercialRelevanceLevel
@@ -283,6 +299,8 @@ try {
 
         return {
             ...signal,
+            rejectionReason,
+            signalQuality,
             sentiment: { score: sentiment.overall.score, label: sentiment.overall.label, towardCompany: sentiment.towardCompany, towardCompetitors: sentiment.towardCompetitors },
             buyingSignals: { hasBudgetSignal: buyingSignals.hasBudgetSignal, hasTimelineSignal: buyingSignals.hasTimelineSignal, hasTechnicalSignal: buyingSignals.hasTechnicalSignal, hasEvaluationSignal: buyingSignals.hasEvaluationSignal, hasDecisionSignal: buyingSignals.hasDecisionSignal, confidence: buyingSignals.confidence, signals: buyingSignals.signals },
             competitorSignals: { hasCompetitiveSignal: competitorSignals.hasCompetitiveSignal, competitors: competitorSignals.competitors },
@@ -421,6 +439,11 @@ try {
     const itemsToPush = [];
     
     for (const signal of enrichedSignals) {
+        // STRICT FILTERING: Drop noisy / rejected signals completely to surface only 1-5 strong commercial opportunities
+        if (signal.signalQuality === 'REJECT') {
+            continue;
+        }
+
         // Truncate content for payload safety
         if (signal.content && signal.content.length > 1500) {
             signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
