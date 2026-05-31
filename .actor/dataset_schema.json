@@ -1,0 +1,243 @@
+{
+    "actorSpecification": 1,
+    "fields": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "_type": {
+                "type": "string",
+                "title": "Record Type",
+                "description": "Type of dataset record: routing_audit, executive_summary, company_aggregate, high_intent_alerts, sales_insights, or a raw signal.",
+                "example": "company_aggregate"
+            },
+            "company": {
+                "type": "string",
+                "title": "Company",
+                "description": "The company name this signal relates to.",
+                "example": "HubSpot"
+            },
+            "title": {
+                "type": "string",
+                "title": "Signal Title",
+                "description": "Title of the scraped post, issue, or discussion.",
+                "example": "Fed up with HubSpot pricing — looking for alternatives"
+            },
+            "source": {
+                "type": "string",
+                "title": "Source",
+                "description": "Platform where the signal was found.",
+                "example": "reddit",
+                "enum": ["reddit", "github", "hackernews", "news", "g2"]
+            },
+            "url": {
+                "type": "string",
+                "title": "URL",
+                "description": "Direct link to the original post or discussion.",
+                "example": "https://old.reddit.com/r/sales/comments/abc123"
+            },
+            "intentScore": {
+                "type": "number",
+                "title": "Intent Score",
+                "description": "Composite buyer intent score from 0-100. Higher means stronger buying signal.",
+                "example": 78
+            },
+            "intentLevel": {
+                "type": "string",
+                "title": "Intent Level",
+                "description": "Categorized intent level based on score thresholds.",
+                "example": "HIGH",
+                "enum": ["HIGH", "MEDIUM", "LOW"]
+            },
+            "leadPriority": {
+                "type": "string",
+                "title": "Lead Priority",
+                "description": "Sales priority classification for CRM routing.",
+                "example": "URGENT",
+                "enum": ["URGENT", "HIGH", "MEDIUM", "LOW"]
+            },
+            "signalQuality": {
+                "type": "string",
+                "title": "Signal Quality",
+                "description": "Quality gate classification. Only HIGH and MEDIUM signals are persisted.",
+                "example": "HIGH",
+                "enum": ["HIGH", "MEDIUM", "LOW"]
+            },
+            "buyingStage": {
+                "type": "string",
+                "title": "Buying Stage",
+                "description": "Predicted position in the B2B buying journey.",
+                "example": "evaluation",
+                "enum": ["awareness", "consideration", "evaluation", "decision"]
+            },
+            "commercialRelevanceScore": {
+                "type": "number",
+                "title": "Commercial Relevance",
+                "description": "Score indicating commercial relevance of the signal (0-1).",
+                "example": 0.85
+            },
+            "commercialRelevanceLevel": {
+                "type": "string",
+                "title": "Relevance Level",
+                "description": "Categorized commercial relevance.",
+                "example": "HIGH",
+                "enum": ["HIGH", "MEDIUM", "LOW"]
+            },
+            "whyHighIntent": {
+                "type": "string",
+                "title": "Intent Explanation",
+                "description": "Human-readable explanation of why this signal was flagged as high intent.",
+                "example": "Frustration + competitor comparison + switching intent detected"
+            },
+            "recommendedOutreachAngle": {
+                "type": "string",
+                "title": "Outreach Angle",
+                "description": "Recommended sales outreach strategy based on detected signals.",
+                "example": "Pain-based: Address frustration with current tool limitations"
+            },
+            "estimatedICPFit": {
+                "type": "string",
+                "title": "ICP Fit",
+                "description": "Estimated Ideal Customer Profile fit score.",
+                "example": "STRONG"
+            },
+            "createdAt": {
+                "type": "string",
+                "title": "Created At",
+                "description": "ISO timestamp when the original content was published.",
+                "example": "2026-05-28T14:30:00.000Z"
+            },
+            "content": {
+                "type": "string",
+                "title": "Content",
+                "description": "Body text of the scraped signal (truncated to 1500 chars).",
+                "example": "We've been using HubSpot for 2 years and the pricing has become unbearable..."
+            },
+            "rejectionReason": {
+                "type": "string",
+                "title": "Rejection Reason",
+                "description": "If set, explains why this signal was filtered out (noise, too old, generic mention).",
+                "example": ""
+            },
+            "isNew": {
+                "type": "boolean",
+                "title": "Is New",
+                "description": "Whether this signal was seen for the first time in this run (monitoring mode).",
+                "example": true
+            }
+        },
+        "required": ["company", "source", "intentScore", "signalQuality"]
+    },
+    "views": {
+        "signals": {
+            "title": "Buying Signals",
+            "description": "High-value B2B buying intent signals with scoring and CRM-ready metadata.",
+            "transformation": {
+                "fields": [
+                    "company",
+                    "title",
+                    "source",
+                    "intentScore",
+                    "leadPriority",
+                    "signalQuality",
+                    "buyingStage",
+                    "whyHighIntent",
+                    "recommendedOutreachAngle",
+                    "url"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "company": {
+                        "label": "Company",
+                        "format": "text"
+                    },
+                    "title": {
+                        "label": "Signal",
+                        "format": "text"
+                    },
+                    "source": {
+                        "label": "Source",
+                        "format": "text"
+                    },
+                    "intentScore": {
+                        "label": "Intent Score",
+                        "format": "number"
+                    },
+                    "leadPriority": {
+                        "label": "Priority",
+                        "format": "text"
+                    },
+                    "signalQuality": {
+                        "label": "Quality",
+                        "format": "text"
+                    },
+                    "buyingStage": {
+                        "label": "Buying Stage",
+                        "format": "text"
+                    },
+                    "whyHighIntent": {
+                        "label": "Why High Intent",
+                        "format": "text"
+                    },
+                    "recommendedOutreachAngle": {
+                        "label": "Outreach Angle",
+                        "format": "text"
+                    },
+                    "url": {
+                        "label": "URL",
+                        "format": "link"
+                    }
+                }
+            }
+        },
+        "insights": {
+            "title": "Aggregated Insights",
+            "description": "Executive summaries, company-level aggregates, and sales insights.",
+            "transformation": {
+                "fields": [
+                    "_type",
+                    "company",
+                    "totalSignals",
+                    "intentScore",
+                    "leadPriority",
+                    "signalQuality",
+                    "buyingStage"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "_type": {
+                        "label": "Type",
+                        "format": "text"
+                    },
+                    "company": {
+                        "label": "Company",
+                        "format": "text"
+                    },
+                    "totalSignals": {
+                        "label": "Total Signals",
+                        "format": "number"
+                    },
+                    "intentScore": {
+                        "label": "Intent Score",
+                        "format": "number"
+                    },
+                    "leadPriority": {
+                        "label": "Priority",
+                        "format": "text"
+                    },
+                    "signalQuality": {
+                        "label": "Quality",
+                        "format": "text"
+                    },
+                    "buyingStage": {
+                        "label": "Buying Stage",
+                        "format": "text"
+                    }
+                }
+            }
+        }
+    }
+}

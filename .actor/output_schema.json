@@ -1,0 +1,12 @@
+{
+    "actorOutputSchemaVersion": 1,
+    "title": "Dark Funnel Intelligence Engine Output",
+    "description": "B2B buyer intent signals, company aggregates, high-intent alerts, and sales insights extracted from Reddit, GitHub, Hacker News, G2, and News sources.",
+    "properties": {
+        "signals": {
+            "type": "string",
+            "title": "Intent Signals & Insights",
+            "template": "{{links.apiDefaultDatasetUrl}}/items"
+        }
+    }
+}
