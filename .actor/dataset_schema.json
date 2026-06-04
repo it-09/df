@@ -45,7 +45,7 @@
                 "title": "Source",
                 "description": "Platform where the signal was found.",
                 "example": "reddit",
-                "enum": ["reddit", "github", "hackernews", "news", "g2"]
+                "enum": ["reddit", "github", "hackernews", "news", "g2", "linkedin"]
             },
             "url": {
                 "type": "string",
