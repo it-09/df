@@ -239,6 +239,16 @@ try {
     log.info(`Total raw signals collected: ${allSignals.length}`);
     await Actor.setStatusMessage(`Collected ${allSignals.length} raw signals. Running NLP analysis...`);
 
+    // SOURCE FORENSICS
+    const forensics = {
+        RAW_SOURCE_COUNTS: {},
+        POST_FILTER_COUNTS: {},
+        LLM_ACCEPT_COUNTS: {},
+        FINAL_PUSH_COUNTS: {}
+    };
+    allSignals.forEach(s => { forensics.RAW_SOURCE_COUNTS[s.source] = (forensics.RAW_SOURCE_COUNTS[s.source] || 0) + 1; });
+
+
     if (allSignals.length === 0) {
         log.warning('No signals found. Try different company names or enable more sources.');
         await pushDataToApify({
@@ -361,6 +371,8 @@ try {
     // We only send candidates >= 40 to the LLM
     const candidates = heuristicSignals.filter(s => s.intentScore >= 40);
     const nonCandidates = heuristicSignals.filter(s => s.intentScore < 40);
+    candidates.forEach(s => { forensics.POST_FILTER_COUNTS[s.source] = (forensics.POST_FILTER_COUNTS[s.source] || 0) + 1; });
+
     
     if (openaiApiKey && candidates.length > 0) {
         log.info(`Filtered down to ${candidates.length} candidates out of ${allSignals.length} raw signals.`);
@@ -375,6 +387,7 @@ try {
                 let whyHighIntent = '';
                 
                 if (llmResult.isGenuineBuyer) {
+                    forensics.LLM_ACCEPT_COUNTS[signal.source] = (forensics.LLM_ACCEPT_COUNTS[signal.source] || 0) + 1;
                     finalScore = llmResult.intentScore;
                     if (finalScore >= 80) leadPriority = 'URGENT';
                     else if (finalScore >= 60) leadPriority = 'HIGH';
@@ -501,8 +514,15 @@ try {
     }
     
     // Replace enrichedSignals with the truncated, balanced subset
+    // HARD DATASET GUARD
     enrichedSignals.length = 0;
-    enrichedSignals.push(...truncatedSignals);
+    for (const signal of truncatedSignals) {
+        if (!signal || !signal.title || !signal.source || !signal.company || !signal.url || signal.title.toLowerCase().includes('undefined')) {
+            log.warning('DROPPED_INVALID_SIGNAL');
+            continue;
+        }
+        enrichedSignals.push(signal);
+    }
     // --- END SOURCE DIVERSITY QUOTAS ---
 
     const qualifiedCount = enrichedSignals.length;
@@ -569,13 +589,8 @@ try {
             signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
         }
 
-        // Task 3: Remove Malformed Dataset Rows
-        if (!signal || !signal.title || !signal.source || !signal.company) {
-            log.warning('Dropped malformed signal before pushing to dataset');
-            continue;
-        }
-
         itemsToPush.push(signal);
+        forensics.FINAL_PUSH_COUNTS[signal.source] = (forensics.FINAL_PUSH_COUNTS[signal.source] || 0) + 1;
         chargedSignals++;
 
         // NEW WAVE 3: Smart Alerts
@@ -668,7 +683,23 @@ try {
         chargedSignals,
     });
 
-    await Actor.setStatusMessage(`Complete: ${chargedSignals} signals, ${highIntentSignals.length} high-intent leads found.`, { isStatusMessageTerminal: true });
+    log.info('--- SOURCE FORENSICS ---');
+    for (const src of Object.keys(forensics.RAW_SOURCE_COUNTS)) {
+        const raw = forensics.RAW_SOURCE_COUNTS[src] || 0;
+        const post = forensics.POST_FILTER_COUNTS[src] || 0;
+        const llm = forensics.LLM_ACCEPT_COUNTS[src] || 0;
+        const fin = forensics.FINAL_PUSH_COUNTS[src] || 0;
+        log.info(`${src}: ${raw} -> ${post} -> ${llm} -> ${fin}`);
+    }
+
+    const finalBuyingSignalCount = Object.values(forensics.FINAL_PUSH_COUNTS).reduce((a,b)=>a+b, 0);
+    const sourceDiversity = Object.keys(forensics.FINAL_PUSH_COUNTS).filter(k => forensics.FINAL_PUSH_COUNTS[k] > 0).length;
+    
+    if (finalBuyingSignalCount < 3 || sourceDiversity < 2) {
+        log.warning('LOW_CONFIDENCE: Final dataset lacks volume or source diversity. Run returned low commercial intelligence.');
+    }
+
+    await Actor.setStatusMessage(`Complete: ${finalBuyingSignalCount} signals, ${highIntentSignals.length} high-intent leads found.`, { isStatusMessageTerminal: true });
 
 } catch (error) {
     log.error('Error during scraping', { error: error.message, stack: error.stack });
