@@ -46,7 +46,7 @@ export async function scrapeReddit(companies, maxResults = 50) {
                 const response = await axiosWithRetry({ method: 'GET', url });
                 const $ = cheerio.load(response.data);
                 
-                $('.search-result').each((i, el) => {
+                $('.search-result-link').each((i, el) => {
                     if (signals.length >= maxResults) return;
                     
                     const title = $(el).find('.search-title').text().trim();

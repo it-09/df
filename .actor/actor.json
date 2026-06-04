@@ -12,5 +12,11 @@
   "storages": {
     "dataset": "./dataset_schema.json"
   },
+  "permissions": {
+    "apifyStorages": {
+      "read": true,
+      "write": true
+    }
+  },
   "dockerfile": "../Dockerfile"
 }

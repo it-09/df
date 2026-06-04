@@ -6,6 +6,7 @@ import { scrapeGitHub } from './scrapers/github.js';
 import { scrapeHackerNews } from './scrapers/hackernews.js';
 import { scrapeNews } from './scrapers/news.js';
 import { scrapeG2 } from './scrapers/g2.js';
+import { scrapeLinkedIn } from './scrapers/linkedin.js';
 
 // Classifiers
 import { analyzeSentiment, analyzeAspectSentiment } from './classifiers/sentiment.js';
@@ -93,14 +94,17 @@ let {
     enableHackernews,
     enableNews,
     enableG2,
+    enableLinkedin,
     // Legacy sources object (backward compat)
     sources,
     newsApiKey = null,
-    openaiApiKey = null,
     monitoringMode = 'off',
     competitorWatch = [],
     knownCompetitors = []
 } = input;
+
+// LLM API key is managed by the Actor owner via environment variable
+const openaiApiKey = process.env.OPENAI_API_KEY || null;
 
 // Apply Templates
 if (templatePreset === 'crm_switching') {
@@ -126,6 +130,7 @@ const resolvedSources = {
     hackernews: enableHackernews ?? sources?.hackernews ?? true,
     news: enableNews ?? sources?.news ?? false,
     g2: enableG2 ?? sources?.g2 ?? true,
+    linkedin: enableLinkedin ?? sources?.linkedin ?? false,
 };
 
 // --- M2: Input validation ---
@@ -158,6 +163,8 @@ log.info('Starting Dark Funnel Intelligence Engine', {
     sources: resolvedSources,
     maxResultsPerCompany: maxResults,
 });
+
+await Actor.setStatusMessage(`Collecting signals from ${Object.values(resolvedSources).filter(Boolean).length} sources for ${validCompanies.length} companies...`);
 
 // Collect signals from all enabled sources
 let allSignals = [];
@@ -221,7 +228,16 @@ try {
         log.info(`G2: ${g2Signals.length} signals collected`);
     }
 
+    // 6. Scrape LinkedIn
+    if (resolvedSources.linkedin) {
+        log.info('Scraping LinkedIn...');
+        const linkedInSignals = await scrapeLinkedIn(validCompanies, maxResults);
+        allSignals.push(...linkedInSignals);
+        log.info(`LinkedIn: ${linkedInSignals.length} signals collected`);
+    }
+
     log.info(`Total raw signals collected: ${allSignals.length}`);
+    await Actor.setStatusMessage(`Collected ${allSignals.length} raw signals. Running NLP analysis...`);
 
     if (allSignals.length === 0) {
         log.warning('No signals found. Try different company names or enable more sources.');
@@ -443,7 +459,9 @@ try {
         }
     }
 
+    const qualifiedCount = enrichedSignals.filter(s => s.signalQuality !== 'REJECT').length;
     log.info('Signal enrichment complete');
+    await Actor.setStatusMessage(`Qualified ${qualifiedCount} high-intent leads. Generating insights...`);
 
     // Push individual signals to dataset + charge per signal (H3: PPE)
     let chargedSignals = 0;
@@ -471,13 +489,13 @@ try {
             }
         }
 
-        // H3: Charge per signal (PPE) — skip first 10 as free trial
-        if (chargedSignals > 10) {
-            try {
-                await Actor.charge({ eventName: 'result-signal', count: 1 });
-            } catch {
-                // Charging may fail if PPE not configured or user on free plan — that's OK
-            }
+        // H3: Charge per signal (PPE) — every signal is charged
+        try {
+            await Actor.charge({ eventName: 'result-signal', count: 1 });
+        } catch (error) {
+            // Charging may fail if user is on Apify free plan or has no card
+            await Actor.setStatusMessage(`Billing limit reached (free plan?). Processed ${chargedSignals - 1} paid signals.`, { isStatusMessageTerminal: false });
+            break;
         }
     }
     
@@ -550,8 +568,10 @@ try {
         totalSignals: enrichedSignals.length,
         companiesAnalyzed: aggregated.length,
         highIntentAlerts: highIntentSignals.length,
-        chargedSignals: Math.max(0, chargedSignals - 10),
+        chargedSignals,
     });
+
+    await Actor.setStatusMessage(`Complete: ${chargedSignals} signals, ${highIntentSignals.length} high-intent leads found.`, { isStatusMessageTerminal: true });
 
 } catch (error) {
     log.error('Error during scraping', { error: error.message, stack: error.stack });

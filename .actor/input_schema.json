@@ -1,5 +1,5 @@
 {
-    "title": "Dark Funnel Scraper",
+    "title": "Dark Funnel Intelligence Engine",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -52,21 +52,12 @@
             "enum": ["off", "daily", "weekly"],
             "enumTitles": ["OFF (One-Time Run)", "DAILY (Track Deltas)", "WEEKLY (Track Deltas)"]
         },
-        "openaiApiKey": {
-            "title": "OpenAI API Key (Required for LLM Evaluation)",
-            "type": "string",
-            "description": "API Key for OpenAI. Used to evaluate signals for genuine buying intent and eliminate false positives.",
-            "editor": "textfield",
-            "isSecret": true,
-            "sectionCaption": "AI Engine (Required)",
-            "sectionDescription": "The LLM evaluator is required to prevent false positives and accurately score intent."
-        },
         "maxRequestsPerCrawl": {
             "title": "Max Results per Company",
             "type": "integer",
-            "description": "Maximum number of results to fetch per company per source. Lower values = faster runs and lower cost. Default: 10.",
+            "description": "Maximum number of results to fetch per company per source. Lower values = faster runs and lower cost. Default: 5.",
             "editor": "number",
-            "default": 10,
+            "default": 5,
             "minimum": 1,
             "maximum": 100,
             "sectionCaption": "Performance",
@@ -103,6 +94,12 @@
             "type": "boolean",
             "description": "Scrape highly commercial G2 Reviews via Google Dorking to bypass Cloudflare. (Recommended)",
             "default": true
+        },
+        "enableLinkedin": {
+            "title": "Enable LinkedIn",
+            "type": "boolean",
+            "description": "Scrape public LinkedIn posts via search engine Dorking for high-intent professional discussions. (Premium Feature)",
+            "default": false
         },
         "newsApiKey": {
             "title": "News API Key",
