@@ -468,6 +468,51 @@ try {
     const itemsToPush = [];
     
     for (const signal of enrichedSignals) {
+        // --- COMMERCIAL READINESS POLISH SPRINT: TASK 1 (Freshness Filtering) ---
+        const ageMs = Date.now() - new Date(signal.createdAt || new Date()).getTime();
+        let ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+        if (isNaN(ageDays) || ageDays < 0) ageDays = 0; // fallback for missing dates
+        
+        signal.contentAgeDays = ageDays;
+        signal.freshnessOverride = false;
+        
+        // Exception rules: explicit high-value commercial behavior
+        const exceptionRegex = /(moving away from|switching from|looking for alternatives|fed up with|replacing|better than|migration)/i;
+        if (exceptionRegex.test(signal.content || '') || exceptionRegex.test(signal.title || '')) {
+            signal.freshnessOverride = true;
+        }
+
+        if (ageDays <= 7) {
+            signal.freshnessCategory = 'HOT';
+            signal.intentScore = Math.min(100, signal.intentScore + 10);
+            signal.confidence = Math.min(1.0, (signal.confidence || 0.5) + 0.1);
+            if (signal.signalQuality === 'MEDIUM') signal.signalQuality = 'HIGH';
+        } else if (ageDays <= 30) {
+            signal.freshnessCategory = 'RECENT';
+        } else if (ageDays <= 90) {
+            signal.freshnessCategory = 'STALE';
+            if (!signal.freshnessOverride) {
+                signal.intentScore = Math.max(0, signal.intentScore - 15);
+                if (signal.signalQuality === 'HIGH') signal.signalQuality = 'MEDIUM';
+            }
+        } else if (ageDays <= 180) {
+            signal.freshnessCategory = 'OLD';
+            if (!signal.freshnessOverride) {
+                signal.intentScore = Math.max(0, signal.intentScore - 30);
+                signal.signalQuality = 'LOW';
+            }
+        } else {
+            // Older than 180 days
+            signal.freshnessCategory = 'ANCIENT';
+            if (!signal.freshnessOverride) {
+                signal.signalQuality = 'REJECT';
+                signal.rejectionReason = `Content too old (${ageDays} days) without explicit commercial exception`;
+            } else {
+                signal.freshnessCategory = 'OLD (EXCEPTED)';
+            }
+        }
+        // --- END FRESHNESS FILTERING ---
+
         // STRICT FILTERING: Drop noisy / rejected signals completely to surface only 1-5 strong commercial opportunities
         if (signal.signalQuality === 'REJECT') {
             continue;

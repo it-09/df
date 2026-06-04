@@ -22,6 +22,24 @@
                 "description": "Title of the scraped post, issue, or discussion.",
                 "example": "Fed up with HubSpot pricing — looking for alternatives"
             },
+            "contentAgeDays": {
+                "type": "number",
+                "title": "Content Age (Days)",
+                "description": "Number of days since the content was created. Used for freshness scoring.",
+                "example": 14
+            },
+            "freshnessCategory": {
+                "type": "string",
+                "title": "Freshness Category",
+                "description": "Categorized age of the content (HOT, RECENT, STALE, OLD, ANCIENT, etc.).",
+                "example": "HOT"
+            },
+            "freshnessOverride": {
+                "type": "boolean",
+                "title": "Freshness Exception Override",
+                "description": "True if an old signal was preserved due to explicit high-value commercial keywords.",
+                "example": false
+            },
             "source": {
                 "type": "string",
                 "title": "Source",
