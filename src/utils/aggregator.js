@@ -154,70 +154,115 @@ function calculateVelocity(firstSeen, lastSeen, totalSignals) {
  * @returns {Object} - Digest object
  */
 export function generateExecutiveSummary(allSignals, highIntentAlerts, mode = 'off') {
-    const commercialSignals = allSignals.filter(s => s.commercialRelevanceLevel !== 'LOW');
-    const newHighIntent = highIntentAlerts.filter(s => s.isNew);
+    const commercialSignals = allSignals.filter(s => s.commercialRelevanceLevel !== 'LOW' && s.signalQuality !== 'REJECT');
     
-    // Calculate top pain theme
+    // B. SWITCHING SIGNALS
+    const switchingSignals = commercialSignals.filter(s => s.crmReady?.switchingDetected);
+    const switchingText = switchingSignals.length > 0 
+        ? `${switchingSignals.length} active competitor switching signals detected.`
+        : 'No immediate switching signals detected.';
+
+    // C. URGENT ACCOUNTS
+    const urgentAccounts = commercialSignals.filter(s => s.intentScore > 90);
+    const urgentText = urgentAccounts.length > 0
+        ? `${urgentAccounts.length} high-confidence opportunities.`
+        : 'No critical urgency accounts identified today.';
+
+    // D. BUYING STAGE MIX
+    const buyingStageBreakdown = {
+        awareness: 0,
+        consideration: 0,
+        evaluation: 0,
+        decision: 0
+    };
+    commercialSignals.forEach(s => {
+        if (s.buyingStage && buyingStageBreakdown[s.buyingStage.toLowerCase()] !== undefined) {
+            buyingStageBreakdown[s.buyingStage.toLowerCase()]++;
+        }
+    });
+
+    // E. TOP PAIN THEMES
     const painThemes = {};
     commercialSignals.forEach(s => {
-        if (s.painSignals?.hasPainSignal) {
-            s.painSignals.painTypes.forEach(p => {
+        if (s.crmReady?.painTypes) {
+            s.crmReady.painTypes.forEach(p => {
                 painThemes[p] = (painThemes[p] || 0) + 1;
             });
         }
     });
-    const topPainTheme = Object.keys(painThemes).sort((a, b) => painThemes[b] - painThemes[a])[0] || 'None detected';
-    
-    // Calculate top competitor risk
-    const competitorMentions = {};
+    const topPainThemes = Object.keys(painThemes).sort((a, b) => painThemes[b] - painThemes[a]).slice(0, 3);
+
+    // A. TOP RISK
+    let topRisk = 'No significant risk patterns detected.';
+    if (topPainThemes.includes('pricing') && switchingSignals.length > 0) {
+        topRisk = `${switchingSignals[0].company || 'Competitor'} users show increasing pricing dissatisfaction and switching intent.`;
+    } else if (topPainThemes.includes('migration')) {
+        topRisk = `Users report migration frustration.`;
+    } else if (switchingSignals.length > 0) {
+        topRisk = `Competitor switching detected for ${switchingSignals[0].company || 'monitored brands'}.`;
+    } else if (topPainThemes.length > 0) {
+        topRisk = `Primary user dissatisfaction revolves around ${topPainThemes.join(', ')}.`;
+    }
+
+    // F. RECOMMENDED OUTREACH
+    let recommendedOutreach = 'Lead with standard value proposition.';
+    if (topPainThemes.includes('pricing')) {
+        recommendedOutreach = 'Lead with transparent pricing and ROI.';
+    } else if (topPainThemes.includes('migration')) {
+        recommendedOutreach = 'Lead with migration support and seamless onboarding.';
+    } else if (topPainThemes.includes('technical')) {
+        recommendedOutreach = 'Lead with implementation simplicity and developer experience.';
+    } else if (switchingSignals.length > 0) {
+        recommendedOutreach = 'Lead with differentiation against incumbents and ease of switching.';
+    }
+
+    // G. SOURCE MIX
+    const sourceMix = {};
+    const totalSignals = commercialSignals.length || 1;
     commercialSignals.forEach(s => {
-        if (s.competitorSignals?.competitors) {
-            s.competitorSignals.competitors.forEach(c => {
-                competitorMentions[c] = (competitorMentions[c] || 0) + 1;
+        sourceMix[s.source] = (sourceMix[s.source] || 0) + 1;
+    });
+    for (const src of Object.keys(sourceMix)) {
+        sourceMix[src] = Math.round((sourceMix[src] / totalSignals) * 100);
+    }
+
+    // H. CONFIDENCE SUMMARY
+    let totalIntent = 0;
+    let totalConfidence = 0;
+    commercialSignals.forEach(s => {
+        totalIntent += (s.intentScore || 0);
+        totalConfidence += (s.confidenceScore || 0);
+    });
+    const avgIntent = commercialSignals.length > 0 ? Math.round(totalIntent / commercialSignals.length) : 0;
+    const avgConfidence = commercialSignals.length > 0 ? (totalConfidence / commercialSignals.length).toFixed(2) : 0;
+
+    const confidenceSummary = {
+        averageIntentScore: avgIntent,
+        averageConfidence: Number(avgConfidence)
+    };
+    
+    // Competitive Pressure
+    const competitors = {};
+    commercialSignals.forEach(s => {
+        if (s.crmReady?.competitors) {
+            s.crmReady.competitors.forEach(c => {
+                competitors[c] = (competitors[c] || 0) + 1;
             });
         }
     });
-    const topCompetitorRisk = Object.keys(competitorMentions).sort((a, b) => competitorMentions[b] - competitorMentions[a])[0] || 'None detected';
-    
-    // Calculate strongest source
-    const sourceCounts = {};
-    commercialSignals.forEach(s => {
-        sourceCounts[s.source] = (sourceCounts[s.source] || 0) + 1;
-    });
-    const strongestSignalSource = Object.keys(sourceCounts).sort((a, b) => sourceCounts[b] - sourceCounts[a])[0] || 'None';
-
-    // Calculate top outreach angle
-    const angles = {};
-    commercialSignals.forEach(s => {
-        if (s.recommendedOutreachAngle) {
-            angles[s.recommendedOutreachAngle] = (angles[s.recommendedOutreachAngle] || 0) + 1;
-        }
-    });
-    const topOutreachAngle = Object.keys(angles).sort((a, b) => angles[b] - angles[a])[0] || 'Standard';
-
-    // Fast growing intent (simplified heuristic for digest)
-    const fastestGrowingIntentSignal = Object.keys(painThemes)[0] || 'alternative discussions';
-
-    if (mode === 'weekly' || mode === 'daily') {
-        return {
-            _type: 'weekly_digest',
-            highIntentLeads: highIntentAlerts.length,
-            newLeads: newHighIntent.length,
-            topPainTheme,
-            topCompetitorRisk,
-            topOutreachAngle,
-            fastestGrowingIntentSignal
-        };
-    }
+    const topCompetitor = Object.keys(competitors).sort((a,b) => competitors[b] - competitors[a])[0];
+    const competitivePressure = topCompetitor ? `High mentions of ${topCompetitor} as alternative/competitor.` : 'Low competitive mentions detected.';
 
     return {
-        _type: 'executive_summary',
-        totalCommercialSignals: commercialSignals.length,
-        highIntentLeads: highIntentAlerts.length,
-        topPainTheme,
-        topCompetitorRisk,
-        strongestSignalSource,
-        topOutreachAngle
+        topRisk,
+        switchingSignals: switchingText,
+        urgentAccounts: urgentText,
+        buyingStageBreakdown,
+        topPainThemes,
+        recommendedOutreach,
+        competitivePressure,
+        sourceMix,
+        confidenceSummary
     };
 }
 

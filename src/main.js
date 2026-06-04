@@ -793,6 +793,65 @@ try {
         await saveMonitorState(seenHashes, statsToSave);
     }
 
+    // Save Premium Executive Summary to KVS
+    await Actor.setValue('EXECUTIVE_SUMMARY', runSummary);
+
+    // Save Markdown version
+    const mdSummary = `
+# Executive Summary
+
+**Top Risk:**
+${runSummary.topRisk}
+
+**Switching Signals:**
+${runSummary.switchingSignals}
+
+**Urgent Accounts:**
+${runSummary.urgentAccounts}
+
+**Top Pain Themes:**
+${runSummary.topPainThemes.join(', ') || 'None'}
+
+**Buying Stage Mix:**
+Awareness: ${runSummary.buyingStageBreakdown.awareness}
+Consideration: ${runSummary.buyingStageBreakdown.consideration}
+Evaluation: ${runSummary.buyingStageBreakdown.evaluation}
+Decision: ${runSummary.buyingStageBreakdown.decision}
+
+**Recommended Outreach:**
+${runSummary.recommendedOutreach}
+`;
+    await Actor.setValue('EXECUTIVE_SUMMARY_MD', mdSummary, { contentType: 'text/markdown' });
+
+    // Print human-readable summary to logs
+    log.info('');
+    log.info('================================================');
+    log.info('EXECUTIVE SUMMARY');
+    log.info('================================================');
+    log.info('');
+    log.info('Top Risk:');
+    log.info(runSummary.topRisk);
+    log.info('');
+    log.info('Switching Signals:');
+    log.info(runSummary.switchingSignals);
+    log.info('');
+    log.info('Urgent Accounts:');
+    log.info(runSummary.urgentAccounts);
+    log.info('');
+    log.info('Top Pain Themes:');
+    log.info(runSummary.topPainThemes.join(', ') || 'None');
+    log.info('');
+    log.info('Buying Stage Mix:');
+    log.info(`Awareness: ${runSummary.buyingStageBreakdown.awareness}`);
+    log.info(`Evaluation: ${runSummary.buyingStageBreakdown.evaluation}`);
+    log.info(`Decision: ${runSummary.buyingStageBreakdown.decision}`);
+    log.info('');
+    log.info('Recommended Outreach:');
+    log.info(runSummary.recommendedOutreach);
+    log.info('');
+    log.info('================================================');
+    log.info('');
+
     for (const companyInsight of aggregated) {
         aggregatedItems.push({
             _type: 'company_aggregate',
