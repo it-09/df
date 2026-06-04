@@ -66,10 +66,10 @@
         "enableReddit": {
             "title": "Enable Reddit",
             "type": "boolean",
-            "description": "Scrape Reddit posts via Apify actor chaining (uses boneswill/reddit-scraper). Requires UNRESTRICTED Actor permissions on Apify platform. Adds ~$0.01-0.05 per company to run cost.",
-            "default": false,
+            "description": "Scrape Reddit posts via Yahoo Search Dorking. Bypasses all Reddit bot-detection natively.",
+            "default": true,
             "sectionCaption": "Data Sources",
-            "sectionDescription": "Choose which sources to scan. GitHub and Hacker News are free and reliable — recommended for first runs."
+            "sectionDescription": "Choose which sources to scan."
         },
         "enableGithub": {
             "title": "Enable GitHub",
@@ -98,8 +98,8 @@
         "enableLinkedin": {
             "title": "Enable LinkedIn",
             "type": "boolean",
-            "description": "Scrape public LinkedIn posts via search engine Dorking for high-intent professional discussions. (Premium Feature)",
-            "default": false
+            "description": "Scrape public LinkedIn posts via search engine Dorking for high-intent professional discussions.",
+            "default": true
         },
         "newsApiKey": {
             "title": "News API Key",

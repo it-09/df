@@ -125,12 +125,12 @@ if (templatePreset === 'crm_switching') {
 
 // Resolve source toggles: new booleans take priority, fall back to legacy object, then defaults
 const resolvedSources = {
-    reddit: enableReddit ?? sources?.reddit ?? false,
+    reddit: enableReddit ?? sources?.reddit ?? true,
     github: enableGithub ?? sources?.github ?? true,
     hackernews: enableHackernews ?? sources?.hackernews ?? true,
     news: enableNews ?? sources?.news ?? false,
     g2: enableG2 ?? sources?.g2 ?? true,
-    linkedin: enableLinkedin ?? sources?.linkedin ?? false,
+    linkedin: enableLinkedin ?? sources?.linkedin ?? true,
 };
 
 // --- M2: Input validation ---
