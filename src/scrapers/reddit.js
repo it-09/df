@@ -44,7 +44,25 @@ export async function scrapeReddit(companies, maxResults = 10) {
                 `migration`, `replacing`, `"fed up"`, `recommendation`
             ];
 
+            const SEO_SPAM_PATTERNS = [
+                /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
+                /\bguide\b/i, /\breview\b/i, /\bcomparison\b/i, /\bcompetitors?\b/i,
+                /\bvs\b/i, /\bversus\b/i, /\bmarket\s+share\b/i, /\branking\b/i,
+                /\blist\s+of\b/i, /\bsoftware\s+like\b/i, /\balternative\s+tools\b/i
+            ];
+
+            const HUMAN_INTENT_PATTERNS = [
+                /\blooking\s+for\b/i, /\bneed\s+alternative\b/i, /\bswitching\s+from\b/i,
+                /\bmoving\s+away\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
+                /\bpricing\s+issue\b/i, /\banyone\s+using\b/i, /\brecommend\b/i,
+                /\brecommendation\b/i, /\bthinking\s+about\b/i, /\breplace\b/i,
+                /\bmigrate\b/i, /\bmigration\b/i, /\bwhat\s+are\s+good\b/i,
+                /\bexperience\s+with\b/i, /\bworth\s+it\b/i, /\bproblem\s+with\b/i,
+                /\bdissatisfied\b/i, /\bfrustrated\b/i, /\bchurn\b/i
+            ];
+
             log.info(`Scraping Reddit (via Yahoo Dorking) for: ${company}`);
+            let diagSpamRejected = 0;
 
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
@@ -75,14 +93,23 @@ export async function scrapeReddit(companies, maxResults = 10) {
                         if (seenUrls.has(urlPath)) return;
                         seenUrls.add(urlPath);
 
-                        // COMMERCIAL FILTERING
+                        // COMMERCIAL FILTERING & SPAM GATE V2
                         const fullText = (title + " " + snippet).toLowerCase();
                         
                         // Hard Reject noise
                         if (/meme|joke|hilarious|funny|satire/i.test(fullText)) return;
                         
+                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
+                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
+
+                        if (isSeoSpam && !hasHumanIntent) {
+                            diagSpamRejected++;
+                            log.debug(`REDDIT_SPAM_REJECTED: ${title}`);
+                            return;
+                        }
+
                         // Must have some commercial/intent keyword to not be a generic mention
-                        if (!/(alternatives|replacing|migration|frustrat|fed up|switch|recommendation|better than|comparison|pricing|evaluation|vs|problems)/i.test(fullText)) {
+                        if (!hasHumanIntent && !/(alternatives|replacing|migration|frustrat|fed up|switch|recommendation|better than|comparison|pricing|evaluation|vs|problems)/i.test(fullText)) {
                             return; // Skip non-commercial chatter
                         }
 
@@ -114,6 +141,7 @@ export async function scrapeReddit(companies, maxResults = 10) {
             }
             
             log.info(`Collected ${signals.length} high-intent Reddit posts for ${company}`);
+            log.info(`REDDIT_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
             return signals;
         })
     );

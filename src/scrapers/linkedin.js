@@ -57,6 +57,24 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             let diagRawResults = 0;
             let diagParsedUrls = 0;
             let diagFilteredSignals = 0;
+            let diagSpamRejected = 0;
+
+            const SEO_SPAM_PATTERNS = [
+                /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
+                /\bguide\b/i, /\breview\b/i, /\bcomparison\b/i, /\bcompetitors?\b/i,
+                /\bvs\b/i, /\bversus\b/i, /\bmarket\s+share\b/i, /\branking\b/i,
+                /\blist\s+of\b/i, /\bsoftware\s+like\b/i, /\balternative\s+tools\b/i
+            ];
+
+            const HUMAN_INTENT_PATTERNS = [
+                /\blooking\s+for\b/i, /\bneed\s+alternative\b/i, /\bswitching\s+from\b/i,
+                /\bmoving\s+away\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
+                /\bpricing\s+issue\b/i, /\banyone\s+using\b/i, /\brecommend\b/i,
+                /\brecommendation\b/i, /\bthinking\s+about\b/i, /\breplace\b/i,
+                /\bmigrate\b/i, /\bmigration\b/i, /\bwhat\s+are\s+good\b/i,
+                /\bexperience\s+with\b/i, /\bworth\s+it\b/i, /\bproblem\s+with\b/i,
+                /\bdissatisfied\b/i, /\bfrustrated\b/i, /\bchurn\b/i
+            ];
 
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
@@ -119,9 +137,19 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                             return;
                         }
 
+                        // COMMERCIAL INTENT GATE V2
+                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
+                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
+
+                        if (isSeoSpam && !hasHumanIntent) {
+                            diagSpamRejected++;
+                            log.debug(`LINKEDIN_SPAM_REJECTED: ${title}`);
+                            return;
+                        }
+
                         // COMMERCIAL BOOST: Expanded to include softer intent keywords
                         const hasCommercial = /(recommendation|alternatives|switching|moving away|replace|vendor|evaluation|pricing|CRM stack|sales stack|pain|frustrated|procurement|tool selection|recommend|evaluating|considering|experience with|thinking about switching)/i.test(fullText);
-                        if (!hasCommercial) {
+                        if (!hasHumanIntent && !hasCommercial) {
                             diagFilteredSignals++;
                             return;
                         }
@@ -148,7 +176,8 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             }
 
             log.info(`LINKEDIN_RAW [${company}]: ${diagRawResults}`);
-            log.info(`LINKEDIN_AFTER_FILTER [${company}]: ${diagParsedUrls - diagFilteredSignals}`);
+            log.info(`LINKEDIN_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
+            log.info(`LINKEDIN_AFTER_FILTER [${company}]: ${diagParsedUrls - diagFilteredSignals - diagSpamRejected}`);
             log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
 
             return signals;

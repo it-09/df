@@ -43,6 +43,24 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             const query = encodeURIComponent(company);
             let diagRawResults = 0;
             let diagFilteredSignals = 0;
+            let diagSpamRejected = 0;
+
+            const SEO_SPAM_PATTERNS = [
+                /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
+                /\bguide\b/i, /\breview\b/i, /\bcomparison\b/i, /\bcompetitors?\b/i,
+                /\bvs\b/i, /\bversus\b/i, /\bmarket\s+share\b/i, /\branking\b/i,
+                /\blist\s+of\b/i, /\bsoftware\s+like\b/i, /\balternative\s+tools\b/i
+            ];
+
+            const HUMAN_INTENT_PATTERNS = [
+                /\blooking\s+for\b/i, /\bneed\s+alternative\b/i, /\bswitching\s+from\b/i,
+                /\bmoving\s+away\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
+                /\bpricing\s+issue\b/i, /\banyone\s+using\b/i, /\brecommend\b/i,
+                /\brecommendation\b/i, /\bthinking\s+about\b/i, /\breplace\b/i,
+                /\bmigrate\b/i, /\bmigration\b/i, /\bwhat\s+are\s+good\b/i,
+                /\bexperience\s+with\b/i, /\bworth\s+it\b/i, /\bproblem\s+with\b/i,
+                /\bdissatisfied\b/i, /\bfrustrated\b/i, /\bchurn\b/i
+            ];
 
             try {
                 // Search stories
@@ -63,9 +81,19 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             continue;
                         }
 
+                        // COMMERCIAL INTENT GATE V2
+                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
+                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
+
+                        if (isSeoSpam && !hasHumanIntent) {
+                            diagSpamRejected++;
+                            log.debug(`HN_SPAM_REJECTED: ${title}`);
+                            continue;
+                        }
+
                         // ALLOW ONLY: commercial/evaluation threads
                         const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
-                        if (!hasCommercial) {
+                        if (!hasHumanIntent && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;
                         }
@@ -106,8 +134,18 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             continue;
                         }
 
+                        // COMMERCIAL INTENT GATE V2
+                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
+                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
+
+                        if (isSeoSpam && !hasHumanIntent) {
+                            diagSpamRejected++;
+                            log.debug(`HN_SPAM_REJECTED: ${title}`);
+                            continue;
+                        }
+
                         const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
-                        if (!hasCommercial) {
+                        if (!hasHumanIntent && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;
                         }
@@ -129,7 +167,8 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             }
 
             log.info(`HN_RAW [${company}]: ${diagRawResults}`);
-            log.info(`HN_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals}`);
+            log.info(`HN_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
+            log.info(`HN_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals - diagSpamRejected}`);
             log.info(`HN_FINAL [${company}]: ${signals.length}`);
 
             return signals;
