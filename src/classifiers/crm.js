@@ -9,42 +9,94 @@
 export function generateExplainability(data) {
     const reasons = [];
     
+    // --- WHY-HIGH-INTENT ENGINE V3: Deterministic mapping ---
+
+    // 1. Switching language (highest signal)
     if (data.switchSignals?.switchingDetected) {
         if (data.switchSignals.switchingFrom) {
-            reasons.push(`switching from ${data.switchSignals.switchingFrom}`);
+            reasons.push(`active competitor switching intent (from ${data.switchSignals.switchingFrom})`);
         } else {
-            reasons.push('switching intent detected');
+            reasons.push('active competitor switching intent');
         }
     }
     
-    if (data.painSignals?.hasPainSignal) {
-        data.painSignals.painTypes.forEach(pt => {
-            reasons.push(`${pt} dissatisfaction`);
-        });
+    // 2. Pain signals — map each type to a precise explanation
+    if (data.painSignals?.hasPainSignal && data.painSignals.painTypes?.length > 0) {
+        for (const pt of data.painSignals.painTypes) {
+            switch (pt) {
+                case 'pricing':
+                    reasons.push('pricing dissatisfaction + budget concern');
+                    break;
+                case 'usability':
+                    reasons.push('workflow dissatisfaction + replacement intent');
+                    break;
+                case 'support':
+                    reasons.push('support dissatisfaction affecting adoption');
+                    break;
+                case 'technical':
+                    reasons.push('technical dissatisfaction affecting adoption');
+                    break;
+                case 'compliance':
+                    reasons.push('compliance/security concern');
+                    break;
+                case 'scaling':
+                    reasons.push('scaling limitations affecting workflow');
+                    break;
+                default:
+                    reasons.push(`${pt} dissatisfaction signal`);
+            }
+        }
+    }
+
+    // 3. Budget/pricing signal (if not already covered by pain)
+    if (data.buyingSignals?.hasBudgetSignal && !reasons.some(r => r.includes('pricing'))) {
+        reasons.push('pricing dissatisfaction + budget concern');
     }
     
-    if (data.personaSignals?.seniorityLevels?.some(l => ['c-suite', 'vp', 'director'].includes(l))) {
-        reasons.push('decision-maker involved');
+    // 4. Evaluation stage
+    if (data.buyingSignals?.hasEvaluationSignal || data.buyingStage === 'evaluation') {
+        reasons.push('active vendor evaluation stage');
     }
-    
-    if (data.buyingStage === 'evaluation') {
-        reasons.push('active evaluation stage');
+
+    // 5. Decision stage
+    if (data.buyingStage === 'decision') {
+        reasons.push('active purchase decision stage');
     }
-    
-    if (data.buyingSignals?.hasBudgetSignal) {
-        reasons.push('budget/pricing mentioned');
-    }
-    
+
+    // 6. Competitor comparison
     if (data.competitorSignals?.competitors?.length > 0) {
-        reasons.push('competitor comparison');
+        reasons.push(`active vendor evaluation stage (vs ${data.competitorSignals.competitors.slice(0, 2).join(', ')})`);
+    }
+
+    // 7. Frustration signal (if pain didn't catch it)
+    if (data.buyingSignals?.hasFrustrationSignal && !reasons.some(r => r.includes('dissatisfaction'))) {
+        reasons.push('workflow dissatisfaction + replacement intent');
+    }
+
+    // 8. Decision-maker involvement
+    if (data.personaSignals?.seniorityLevels?.some(l => ['c-suite', 'vp', 'director'].includes(l))) {
+        reasons.push('decision-maker involvement detected');
     }
     
-    // Fallback if empty but intent is high
-    if (reasons.length === 0 && data.intentScore >= 40) {
-        reasons.push('general buying signals detected');
+    // 9. Technical pain
+    if (data.buyingSignals?.hasTechnicalSignal && !reasons.some(r => r.includes('technical'))) {
+        reasons.push('technical dissatisfaction affecting adoption');
+    }
+
+    // 10. Timeline urgency
+    if (data.buyingSignals?.hasTimelineSignal) {
+        reasons.push('timeline urgency detected');
+    }
+
+    // Deduplicate
+    const unique = [...new Set(reasons)];
+    
+    // LAST RESORT fallback — only if nothing else matched
+    if (unique.length === 0 && data.intentScore >= 40) {
+        unique.push('general buying signals detected');
     }
     
-    return reasons;
+    return unique;
 }
 
 /**

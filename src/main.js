@@ -440,6 +440,26 @@ try {
         }
     }
 
+    // --- WHY-HIGH-INTENT V3: Forensic logging ---
+    let whyFallbackCount = 0;
+    let whyGeneratedCount = 0;
+    for (const signal of enrichedSignals) {
+        if (signal.whyHighIntent && signal.whyHighIntent.includes('general buying signals detected') && !signal.whyHighIntent.includes('+')) {
+            whyFallbackCount++;
+        } else if (signal.whyHighIntent && signal.whyHighIntent.length > 0) {
+            whyGeneratedCount++;
+        }
+    }
+    log.info(`WHY_HIGH_INTENT_GENERATED: ${whyGeneratedCount}`);
+    log.info(`WHY_HIGH_INTENT_FALLBACK: ${whyFallbackCount}`);
+    if (enrichedSignals.length > 0) {
+        const fallbackPct = Math.round((whyFallbackCount / enrichedSignals.length) * 100);
+        log.info(`WHY_HIGH_INTENT_FALLBACK_PCT: ${fallbackPct}%`);
+        if (fallbackPct > 10) {
+            log.warning(`WHY_HIGH_INTENT quality warning: ${fallbackPct}% of rows using generic fallback (target: <10%)`);
+        }
+    }
+
     // Add back the non-candidates (they just stay LOW)
     for (const signal of nonCandidates) {
         signal.whyHighIntent = '';
@@ -472,40 +492,64 @@ try {
         }
     }
 
-    // --- SOURCE QUALITY RECOVERY SPRINT: TASK 4 (Source Diversity Quotas) ---
-    // 1. Sort signals intelligently
+    // --- SOURCE BALANCING V3 ---
+    log.info('SOURCE_BALANCING_START');
+
+    // 1. Sort signals by buyer-intent quality ranking
     const stageVal = { 'decision': 4, 'evaluation': 3, 'consideration': 2, 'awareness': 1, 'none': 0 };
     enrichedSignals.sort((a, b) => {
-        // 1. Strongest intent score
-        if (b.intentScore !== a.intentScore) return b.intentScore - a.intentScore;
-        // 2. Switching signals
+        // Priority 1: Human switching pain
         const aSwitch = a.switchSignals?.switchingDetected ? 1 : 0;
         const bSwitch = b.switchSignals?.switchingDetected ? 1 : 0;
         if (bSwitch !== aSwitch) return bSwitch - aSwitch;
-        // 3. Pricing pain
+        // Priority 2: Pricing complaints
         const aPrice = a.painSignals?.painTypes?.includes('pricing') ? 1 : 0;
         const bPrice = b.painSignals?.painTypes?.includes('pricing') ? 1 : 0;
         if (bPrice !== aPrice) return bPrice - aPrice;
-        // 4. Buying stage
+        // Priority 3: Vendor comparison
+        const aComp = a.competitorSignals?.hasCompetitiveSignal ? 1 : 0;
+        const bComp = b.competitorSignals?.hasCompetitiveSignal ? 1 : 0;
+        if (bComp !== aComp) return bComp - aComp;
+        // Priority 4: Recommendation requests (evaluation stage)
         const aStage = stageVal[a.buyingStage] || 0;
         const bStage = stageVal[b.buyingStage] || 0;
         if (bStage !== aStage) return bStage - aStage;
-        // 5. Freshness
+        // Priority 5: Intent score tiebreaker
+        if (b.intentScore !== a.intentScore) return b.intentScore - a.intentScore;
+        // Priority 6: Freshness
         return (a.contentAgeDays || 0) - (b.contentAgeDays || 0);
     });
 
-    // 2. Apply hard caps per source based on diversity targets
-    const sourceQuotas = { 'reddit': 10, 'linkedin': 5, 'g2': 4, 'hackernews': 2, 'github': 1 };
+    // 2. Calculate available signals per source
+    const availableBySource = {};
+    for (const signal of enrichedSignals) {
+        if (signal.signalQuality === 'REJECT') continue;
+        availableBySource[signal.source] = (availableBySource[signal.source] || 0) + 1;
+    }
+    log.info('SOURCE_AVAILABLE:', availableBySource);
+
+    // 3. Apply V3 quotas with minimum guarantees
+    // Target: reddit 35%, linkedin 30%, g2 20%, hackernews 10%, github 5%
+    const totalAvailable = Object.values(availableBySource).reduce((a, b) => a + b, 0);
+    const sourceQuotas = {
+        'reddit': Math.max(3, Math.min(Math.ceil(totalAvailable * 0.40), availableBySource['reddit'] || 0)),
+        'linkedin': Math.max(2, Math.min(Math.ceil(totalAvailable * 0.30), availableBySource['linkedin'] || 0)),
+        'g2': Math.max(2, Math.min(Math.ceil(totalAvailable * 0.20), availableBySource['g2'] || 0)),
+        'hackernews': Math.min(2, availableBySource['hackernews'] || 0),
+        'github': Math.min(1, availableBySource['github'] || 0)
+    };
+    log.info('SOURCE_QUOTAS:', sourceQuotas);
+
     const sourceCounts = {};
     const truncatedSignals = [];
 
     for (const signal of enrichedSignals) {
-        if (signal.signalQuality === 'REJECT') continue; // Drop rejects early
+        if (signal.signalQuality === 'REJECT') continue;
         
         const src = signal.source;
         if (!sourceCounts[src]) sourceCounts[src] = 0;
         
-        if (sourceCounts[src] < (sourceQuotas[src] || 5)) {
+        if (sourceCounts[src] < (sourceQuotas[src] || 1)) {
             truncatedSignals.push(signal);
             sourceCounts[src]++;
         } else {
@@ -523,7 +567,22 @@ try {
         }
         enrichedSignals.push(signal);
     }
-    // --- END SOURCE DIVERSITY QUOTAS ---
+
+    // Log final balance
+    const finalSourceCounts = {};
+    for (const signal of enrichedSignals) {
+        finalSourceCounts[signal.source] = (finalSourceCounts[signal.source] || 0) + 1;
+    }
+    log.info('SOURCE_BALANCING_RESULT:', finalSourceCounts);
+    const totalFinal = enrichedSignals.length;
+    if (totalFinal > 0) {
+        for (const [src, count] of Object.entries(finalSourceCounts)) {
+            if ((count / totalFinal) > 0.80) {
+                log.warning(`SOURCE_DIVERSITY_WARNING: ${src} dominates at ${Math.round((count / totalFinal) * 100)}%`);
+            }
+        }
+    }
+    // --- END SOURCE BALANCING V3 ---
 
     const qualifiedCount = enrichedSignals.length;
     log.info(`Signal enrichment complete. Balanced dataset contains ${qualifiedCount} signals.`);

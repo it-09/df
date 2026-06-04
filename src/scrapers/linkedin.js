@@ -24,6 +24,38 @@ async function axiosWithRetry(config, retries = 3) {
     }
 }
 
+// ========================================================
+// LINKEDIN COMMERCIAL GATING V4 — STRICT ALLOW/DENY SYSTEM
+// ========================================================
+
+const DENY_PATTERNS = [
+    /\bhow\s+to\b/i, /\bguide\b/i, /\btips\b/i, /\bbest\s+practices\b/i,
+    /\badoption\b/i, /\blaunch\b/i, /\bfunding\b/i, /\bhiring\b/i,
+    /\bcareer\b/i, /\bthought\s+leadership\b/i, /\bwhy\s+companies\b/i,
+    /\bmarketing\s+strategy\b/i, /\bgrowth\s+tips\b/i, /\bindustry\s+trends\b/i,
+    /\bAI\s+trend/i, /\bannouncement\b/i, /\bjob\s+opening\b/i,
+    /\bwe\s+are\s+hiring\b/i, /\bcompany\s+announcement\b/i, /\bproduct\s+launch\b/i,
+    /\bemployee\s+celebration\b/i, /\bfundraising\b/i, /\beducational\b/i,
+    /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
+    /\branking\b/i, /\blist\s+of\b/i, /\bsoftware\s+like\b/i,
+    /\balternative\s+tools\b/i, /\bmarket\s+share\b/i
+];
+
+const ALLOW_PATTERNS = [
+    /\balternatives\b/i, /\bswitching\s+from\b/i, /\bmoving\s+away\b/i,
+    /\bfrustrated\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
+    /\bpricing\b/i, /\brenewal\b/i, /\brecommend\b/i,
+    /\brecommendation\b/i, /\bcomparison\b/i, /\bvs\b/i,
+    /\breplace\b/i, /\breplacement\b/i, /\bmigration\b/i,
+    /\bbetter\s+than\b/i, /\bneed\s+a\s+new\b/i, /\bwhat\s+should\s+we\s+use\b/i,
+    /\bwhat\s+CRM\b/i, /\banyone\s+using\b/i, /\bexperience\s+with\b/i,
+    /\bleaving\b/i, /\bcancelled\b/i, /\blooking\s+for\b/i,
+    /\bneed\s+alternative\b/i, /\bpricing\s+issue\b/i,
+    /\bthinking\s+about\b/i, /\bmigrate\b/i, /\bwhat\s+are\s+good\b/i,
+    /\bworth\s+it\b/i, /\bproblem\s+with\b/i, /\bdissatisfied\b/i,
+    /\bchurn\b/i
+];
+
 /**
  * Scrape LinkedIn posts using Yahoo Search Dorking.
  * Yahoo Search is extremely permissive with bots and datacenter IPs compared to Google/DDG.
@@ -55,26 +87,9 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             log.info(`Scraping LinkedIn (via Yahoo Dorking) for: ${company}`);
             
             let diagRawResults = 0;
-            let diagParsedUrls = 0;
-            let diagFilteredSignals = 0;
-            let diagSpamRejected = 0;
-
-            const SEO_SPAM_PATTERNS = [
-                /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
-                /\bguide\b/i, /\breview\b/i, /\bcomparison\b/i, /\bcompetitors?\b/i,
-                /\bvs\b/i, /\bversus\b/i, /\bmarket\s+share\b/i, /\branking\b/i,
-                /\blist\s+of\b/i, /\bsoftware\s+like\b/i, /\balternative\s+tools\b/i
-            ];
-
-            const HUMAN_INTENT_PATTERNS = [
-                /\blooking\s+for\b/i, /\bneed\s+alternative\b/i, /\bswitching\s+from\b/i,
-                /\bmoving\s+away\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
-                /\bpricing\s+issue\b/i, /\banyone\s+using\b/i, /\brecommend\b/i,
-                /\brecommendation\b/i, /\bthinking\s+about\b/i, /\breplace\b/i,
-                /\bmigrate\b/i, /\bmigration\b/i, /\bwhat\s+are\s+good\b/i,
-                /\bexperience\s+with\b/i, /\bworth\s+it\b/i, /\bproblem\s+with\b/i,
-                /\bdissatisfied\b/i, /\bfrustrated\b/i, /\bchurn\b/i
-            ];
+            let diagNoiseRejected = 0;
+            let diagCommercialPass = 0;
+            let diagLowConfidence = 0;
 
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
@@ -98,18 +113,14 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
 
                         // Skip non-post pages
                         if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) {
-                            diagFilteredSignals++;
                             return;
                         }
                         if (!title && !snippet) {
-                            diagFilteredSignals++;
                             return;
                         }
-                        diagParsedUrls++;
 
                         // Deduplication by URL
                         if (seenUrls.has(urlPath)) {
-                            diagFilteredSignals++;
                             return;
                         }
                         seenUrls.add(urlPath);
@@ -130,28 +141,25 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
 
                         const fullText = (title + " " + snippet).toLowerCase();
 
-                        // NOISE REJECTION: Hard reject fluffy/hiring/corporate posts (slightly relaxed)
-                        const isNoise = /(hiring|job opening|we are hiring|company announcement|product launch|employee celebration|fundraising)/i.test(fullText);
-                        if (isNoise) {
-                            diagFilteredSignals++;
+                        // ============================================
+                        // STRICT LINKEDIN COMMERCIAL GATING V4
+                        // ============================================
+                        const hasDenyPattern = DENY_PATTERNS.some(r => r.test(fullText));
+                        const hasCommercialIntent = ALLOW_PATTERNS.some(r => r.test(fullText));
+
+                        if (hasDenyPattern && !hasCommercialIntent) {
+                            diagNoiseRejected++;
+                            log.debug(`LINKEDIN_NOISE_REJECTED: ${title}`);
                             return;
                         }
 
-                        // COMMERCIAL INTENT GATE V2
-                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
-                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
-
-                        if (isSeoSpam && !hasHumanIntent) {
-                            diagSpamRejected++;
-                            log.debug(`LINKEDIN_SPAM_REJECTED: ${title}`);
-                            return;
-                        }
-
-                        // COMMERCIAL BOOST: Expanded to include softer intent keywords
-                        const hasCommercial = /(recommendation|alternatives|switching|moving away|replace|vendor|evaluation|pricing|CRM stack|sales stack|pain|frustrated|procurement|tool selection|recommend|evaluating|considering|experience with|thinking about switching)/i.test(fullText);
-                        if (!hasHumanIntent && !hasCommercial) {
-                            diagFilteredSignals++;
-                            return;
+                        if (hasCommercialIntent) {
+                            diagCommercialPass++;
+                        } else {
+                            // No deny pattern, but also no commercial intent — low confidence
+                            diagLowConfidence++;
+                            log.debug(`LINKEDIN_LOW_CONFIDENCE: ${title}`);
+                            return; // Skip ambiguous content
                         }
 
                         signals.push({
@@ -176,8 +184,9 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             }
 
             log.info(`LINKEDIN_RAW [${company}]: ${diagRawResults}`);
-            log.info(`LINKEDIN_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
-            log.info(`LINKEDIN_AFTER_FILTER [${company}]: ${diagParsedUrls - diagFilteredSignals - diagSpamRejected}`);
+            log.info(`LINKEDIN_NOISE_REJECTED [${company}]: ${diagNoiseRejected}`);
+            log.info(`LINKEDIN_COMMERCIAL_PASS [${company}]: ${diagCommercialPass}`);
+            log.info(`LINKEDIN_LOW_CONFIDENCE [${company}]: ${diagLowConfidence}`);
             log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
 
             return signals;
