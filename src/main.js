@@ -33,7 +33,8 @@ const datasetId = process.env.APIFY_DEFAULT_DATASET_ID;
 
 async function pushDataToApify(items, typeLabel = 'data') {
     if (!token || !datasetId) {
-        log.warning(`Missing APIFY_TOKEN or APIFY_DEFAULT_DATASET_ID. Skipping REST push for ${typeLabel}.`);
+        log.warning(`Missing APIFY_TOKEN or APIFY_DEFAULT_DATASET_ID. Using local Actor.pushData fallback for ${typeLabel}.`);
+        await Actor.pushData(items);
         return;
     }
     const url = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`;
@@ -68,18 +69,20 @@ async function pushDataToApify(items, typeLabel = 'data') {
     }
 }
 
-log.info('--- DATASET ROUTING FORENSIC AUDIT ---');
-log.info('Default dataset env:', { id: datasetId });
-log.info('Actor env dataset ID:', { id: Actor.getEnv().defaultDatasetId });
+if (process.env.DEBUG_MODE === 'true') {
+    log.info('--- DATASET ROUTING FORENSIC AUDIT ---');
+    log.info('Default dataset env:', { id: datasetId });
+    log.info('Actor env dataset ID:', { id: Actor.getEnv().defaultDatasetId });
 
-log.info('Dataset info:', {
-    id: datasetId,
-    isLocal: process.env.APIFY_IS_AT_HOME === '1' ? false : true
-});
+    log.info('Dataset info:', {
+        id: datasetId,
+        isLocal: process.env.APIFY_IS_AT_HOME === '1' ? false : true
+    });
 
-log.info('Pushing single tracking record via REST API...');
-await pushDataToApify({ _type: 'routing_audit', timestamp: new Date().toISOString() }, 'routing_audit');
-log.info('--------------------------------------------');
+    log.info('Pushing single tracking record via REST API...');
+    await pushDataToApify({ _type: 'routing_audit', timestamp: new Date().toISOString() }, 'routing_audit');
+    log.info('--------------------------------------------');
+}
 
 const input = (await Actor.getInput()) ?? {};
 
@@ -251,18 +254,20 @@ try {
     }
 
     // --- PIPELINE TIMING SUMMARY ---
-    log.info('--- PIPELINE_TIMING_SUMMARY ---');
-    let totalScrapeMs = 0;
-    for (const [src, ms] of Object.entries(pipelineTimings)) {
-        log.info(`  ${src}: ${ms}ms (${(ms / 1000).toFixed(1)}s)`);
-        totalScrapeMs += ms;
+    if (process.env.DEBUG_MODE === 'true') {
+        log.info('--- PIPELINE_TIMING_SUMMARY ---');
+        let totalScrapeMs = 0;
+        for (const [src, ms] of Object.entries(pipelineTimings)) {
+            log.info(`  ${src}: ${ms}ms (${(ms / 1000).toFixed(1)}s)`);
+            totalScrapeMs += ms;
+        }
+        log.info(`  TOTAL_SCRAPE_TIME: ${totalScrapeMs}ms (${(totalScrapeMs / 1000).toFixed(1)}s)`);
+        if (totalScrapeMs > 0) {
+            const sorted = Object.entries(pipelineTimings).sort((a, b) => b[1] - a[1]);
+            log.info(`  SLOWEST_SOURCE: ${sorted[0][0]} (${sorted[0][1]}ms — ${Math.round((sorted[0][1] / totalScrapeMs) * 100)}% of total)`);
+        }
+        log.info('-------------------------------');
     }
-    log.info(`  TOTAL_SCRAPE_TIME: ${totalScrapeMs}ms (${(totalScrapeMs / 1000).toFixed(1)}s)`);
-    if (totalScrapeMs > 0) {
-        const sorted = Object.entries(pipelineTimings).sort((a, b) => b[1] - a[1]);
-        log.info(`  SLOWEST_SOURCE: ${sorted[0][0]} (${sorted[0][1]}ms — ${Math.round((sorted[0][1] / totalScrapeMs) * 100)}% of total)`);
-    }
-    log.info('-------------------------------');
 
     log.info(`Total raw signals collected: ${allSignals.length}`);
     await Actor.setStatusMessage(`Collected ${allSignals.length} raw signals. Running NLP analysis...`);
@@ -478,13 +483,16 @@ try {
             whyGeneratedCount++;
         }
     }
-    log.info(`WHY_HIGH_INTENT_GENERATED: ${whyGeneratedCount}`);
-    log.info(`WHY_HIGH_INTENT_FALLBACK: ${whyFallbackCount}`);
-    if (enrichedSignals.length > 0) {
-        const fallbackPct = Math.round((whyFallbackCount / enrichedSignals.length) * 100);
-        log.info(`WHY_HIGH_INTENT_FALLBACK_PCT: ${fallbackPct}%`);
-        if (fallbackPct > 10) {
-            log.warning(`WHY_HIGH_INTENT quality warning: ${fallbackPct}% of rows using generic fallback (target: <10%)`);
+    
+    if (process.env.DEBUG_MODE === 'true') {
+        log.info(`WHY_HIGH_INTENT_GENERATED: ${whyGeneratedCount}`);
+        log.info(`WHY_HIGH_INTENT_FALLBACK: ${whyFallbackCount}`);
+        if (enrichedSignals.length > 0) {
+            const fallbackPct = Math.round((whyFallbackCount / enrichedSignals.length) * 100);
+            log.info(`WHY_HIGH_INTENT_FALLBACK_PCT: ${fallbackPct}%`);
+            if (fallbackPct > 10) {
+                log.warning(`WHY_HIGH_INTENT quality warning: ${fallbackPct}% of rows using generic fallback (target: <10%)`);
+            }
         }
     }
 
@@ -521,7 +529,7 @@ try {
     }
 
     // --- SOURCE BALANCING V3 ---
-    log.info('SOURCE_BALANCING_START');
+    if (process.env.DEBUG_MODE === 'true') log.info('SOURCE_BALANCING_START');
 
     // 1. Sort signals by buyer-intent quality ranking
     const stageVal = { 'decision': 4, 'evaluation': 3, 'consideration': 2, 'awareness': 1, 'none': 0 };
@@ -554,7 +562,7 @@ try {
         if (signal.signalQuality === 'REJECT') continue;
         availableBySource[signal.source] = (availableBySource[signal.source] || 0) + 1;
     }
-    log.info('SOURCE_AVAILABLE:', availableBySource);
+    if (process.env.DEBUG_MODE === 'true') log.info('SOURCE_AVAILABLE:', availableBySource);
 
     // 3. Apply V3 quotas with minimum guarantees
     // Target: reddit 35%, linkedin 30%, g2 20%, hackernews 10%, github 5%
@@ -566,7 +574,7 @@ try {
         'hackernews': Math.min(2, availableBySource['hackernews'] || 0),
         'github': Math.min(1, availableBySource['github'] || 0)
     };
-    log.info('SOURCE_QUOTAS:', sourceQuotas);
+    if (process.env.DEBUG_MODE === 'true') log.info('SOURCE_QUOTAS:', sourceQuotas);
 
     const sourceCounts = {};
     const truncatedSignals = [];
@@ -601,7 +609,7 @@ try {
     for (const signal of enrichedSignals) {
         finalSourceCounts[signal.source] = (finalSourceCounts[signal.source] || 0) + 1;
     }
-    log.info('SOURCE_BALANCING_RESULT:', finalSourceCounts);
+    if (process.env.DEBUG_MODE === 'true') log.info('SOURCE_BALANCING_RESULT:', finalSourceCounts);
     const totalFinal = enrichedSignals.length;
     if (totalFinal > 0) {
         for (const [src, count] of Object.entries(finalSourceCounts)) {
@@ -819,13 +827,15 @@ try {
         chargedSignals,
     });
 
-    log.info('--- SOURCE FORENSICS ---');
-    for (const src of Object.keys(forensics.RAW_SOURCE_COUNTS)) {
-        const raw = forensics.RAW_SOURCE_COUNTS[src] || 0;
-        const post = forensics.POST_FILTER_COUNTS[src] || 0;
-        const llm = forensics.LLM_ACCEPT_COUNTS[src] || 0;
-        const fin = forensics.FINAL_PUSH_COUNTS[src] || 0;
-        log.info(`${src}: ${raw} -> ${post} -> ${llm} -> ${fin}`);
+    if (process.env.DEBUG_MODE === 'true') {
+        log.info('--- SOURCE FORENSICS ---');
+        for (const src of Object.keys(forensics.RAW_SOURCE_COUNTS)) {
+            const raw = forensics.RAW_SOURCE_COUNTS[src] || 0;
+            const post = forensics.POST_FILTER_COUNTS[src] || 0;
+            const llm = forensics.LLM_ACCEPT_COUNTS[src] || 0;
+            const fin = forensics.FINAL_PUSH_COUNTS[src] || 0;
+            log.info(`${src}: ${raw} -> ${post} -> ${llm} -> ${fin}`);
+        }
     }
 
     const finalBuyingSignalCount = Object.values(forensics.FINAL_PUSH_COUNTS).reduce((a,b)=>a+b, 0);

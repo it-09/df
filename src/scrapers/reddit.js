@@ -143,12 +143,14 @@ export async function scrapeReddit(companies, maxResults = 10) {
             }
             
             log.info(`Collected ${signals.length} high-intent Reddit posts for ${company}`);
-            log.info(`REDDIT_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
-            log.info(`REDDIT_RAW [${company}]: ${seenUrls.size}`);
-            log.info(`REDDIT_FILTERED [${company}]: ${signals.length}`);
-            const companyDuration = Date.now() - companyStart;
-            log.info(`REDDIT_END [${company}]`);
-            log.info(`REDDIT_DURATION_MS [${company}]: ${companyDuration}`);
+            if (process.env.DEBUG_MODE === 'true') {
+                log.info(`REDDIT_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
+                log.info(`REDDIT_RAW [${company}]: ${seenUrls.size}`);
+                log.info(`REDDIT_FILTERED [${company}]: ${signals.length}`);
+                const companyDuration = Date.now() - companyStart;
+                log.info(`REDDIT_END [${company}]`);
+                log.info(`REDDIT_DURATION_MS [${company}]: ${companyDuration}`);
+            }
             return signals;
         })
     );

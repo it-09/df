@@ -185,15 +185,17 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                 }
             }
 
-            log.info(`LINKEDIN_RAW [${company}]: ${diagRawResults}`);
-            log.info(`LINKEDIN_NOISE_REJECTED [${company}]: ${diagNoiseRejected}`);
-            log.info(`LINKEDIN_COMMERCIAL_PASS [${company}]: ${diagCommercialPass}`);
-            log.info(`LINKEDIN_LOW_CONFIDENCE [${company}]: ${diagLowConfidence}`);
-            log.info(`LINKEDIN_FILTERED [${company}]: ${signals.length}`);
-            const companyDuration = Date.now() - companyStart;
-            log.info(`LINKEDIN_END [${company}]`);
-            log.info(`LINKEDIN_DURATION_MS [${company}]: ${companyDuration}`);
-            log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
+            if (process.env.DEBUG_MODE === 'true') {
+                log.info(`LINKEDIN_RAW [${company}]: ${diagRawResults}`);
+                log.info(`LINKEDIN_NOISE_REJECTED [${company}]: ${diagNoiseRejected}`);
+                log.info(`LINKEDIN_COMMERCIAL_PASS [${company}]: ${diagCommercialPass}`);
+                log.info(`LINKEDIN_LOW_CONFIDENCE [${company}]: ${diagLowConfidence}`);
+                log.info(`LINKEDIN_FILTERED [${company}]: ${signals.length}`);
+                const companyDuration = Date.now() - companyStart;
+                log.info(`LINKEDIN_END [${company}]`);
+                log.info(`LINKEDIN_DURATION_MS [${company}]: ${companyDuration}`);
+                log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
+            }
 
             return signals;
         })

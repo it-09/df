@@ -122,18 +122,22 @@ export async function scrapeG2(companies, maxResults = 10) {
                     });
                 });
 
-                log.info(`G2_RAW [${company}]: ${diagRawResults}`);
-                log.info(`G2_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
-                log.info(`G2_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals - diagSpamRejected}`);
-                log.info(`G2_FINAL [${company}]: ${signals.length}`);
+                if (process.env.DEBUG_MODE === 'true') {
+                    log.info(`G2_RAW [${company}]: ${diagRawResults}`);
+                    log.info(`G2_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
+                    log.info(`G2_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals - diagSpamRejected}`);
+                    log.info(`G2_FINAL [${company}]: ${signals.length}`);
+                }
             } catch (err) {
                 log.warning(`G2 scraping failed for ${company}`, { error: err.message });
             }
 
-            log.info(`G2_FILTERED [${company}]: ${signals.length}`);
-            const companyDuration = Date.now() - companyStart;
-            log.info(`G2_END [${company}]`);
-            log.info(`G2_DURATION_MS [${company}]: ${companyDuration}`);
+            if (process.env.DEBUG_MODE === 'true') {
+                log.info(`G2_FILTERED [${company}]: ${signals.length}`);
+                const companyDuration = Date.now() - companyStart;
+                log.info(`G2_END [${company}]`);
+                log.info(`G2_DURATION_MS [${company}]: ${companyDuration}`);
+            }
 
             return signals;
         })

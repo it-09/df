@@ -90,11 +90,13 @@ export async function scrapeGitHub(companies, maxResults = 10) {
             } catch (err) {
                 log.warning(`GitHub scraping error for ${company}`, { error: err.message });
             }
-            log.info(`GITHUB_RAW [${company}]: ${rawCount}`);
-            log.info(`GITHUB_FILTERED [${company}]: ${signals.length}`);
-            const companyDuration = Date.now() - companyStart;
-            log.info(`GITHUB_END [${company}]`);
-            log.info(`GITHUB_DURATION_MS [${company}]: ${companyDuration}`);
+            if (process.env.DEBUG_MODE === 'true') {
+                log.info(`GITHUB_RAW [${company}]: ${rawCount}`);
+                log.info(`GITHUB_FILTERED [${company}]: ${signals.length}`);
+                const companyDuration = Date.now() - companyStart;
+                log.info(`GITHUB_END [${company}]`);
+                log.info(`GITHUB_DURATION_MS [${company}]: ${companyDuration}`);
+            }
             return signals;
         })
     );
