@@ -40,16 +40,16 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             const seenUrls = new Set();
             
             const queries = [
-                `site:linkedin.com/posts "${company}" alternatives`,
-                `site:linkedin.com/posts "${company}" recommendation`,
+                `site:linkedin.com/posts "${company}" alternative`,
+                `site:linkedin.com/feed/update "${company}" alternative`,
                 `site:linkedin.com/posts "${company}" pricing`,
-                `site:linkedin.com/posts "${company}" vs`,
-                `site:linkedin.com/posts "${company}" switching`,
-                `site:linkedin.com/posts CRM recommendation`,
-                `site:linkedin.com/posts sales stack`,
-                `site:linkedin.com/posts marketing automation alternatives`,
-                `site:linkedin.com/posts GTM stack`,
-                `site:linkedin.com/posts revops tools`
+                `site:linkedin.com/feed/update "${company}" pricing`,
+                `site:linkedin.com/posts "switching from ${company}"`,
+                `site:linkedin.com/feed/update "moving away from ${company}"`,
+                `site:linkedin.com/posts crm recommendation`,
+                `site:linkedin.com/feed/update crm alternatives`,
+                `site:linkedin.com/posts looking for crm`,
+                `site:linkedin.com/posts best crm for`
             ];
 
             log.info(`Scraping LinkedIn (via Yahoo Dorking) for: ${company}`);
@@ -112,15 +112,15 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
 
                         const fullText = (title + " " + snippet).toLowerCase();
 
-                        // NOISE REJECTION: Hard reject fluffy/hiring/corporate posts
-                        const isNoise = /(hiring|job opening|we are hiring|conference|event|webinar|company announcement|product launch|employee celebration|fundraising|thought leadership fluff)/i.test(fullText);
+                        // NOISE REJECTION: Hard reject fluffy/hiring/corporate posts (slightly relaxed)
+                        const isNoise = /(hiring|job opening|we are hiring|company announcement|product launch|employee celebration|fundraising)/i.test(fullText);
                         if (isNoise) {
                             diagFilteredSignals++;
                             return;
                         }
 
-                        // COMMERCIAL BOOST: Must have commercial intent to be a quality signal (optional strict gate depending on needs, but we'll score it implicitly by keeping it)
-                        const hasCommercial = /(recommendation|alternatives|switching|moving away|replace|vendor|evaluation|pricing|CRM stack|sales stack|pain|frustrated|procurement|tool selection)/i.test(fullText);
+                        // COMMERCIAL BOOST: Expanded to include softer intent keywords
+                        const hasCommercial = /(recommendation|alternatives|switching|moving away|replace|vendor|evaluation|pricing|CRM stack|sales stack|pain|frustrated|procurement|tool selection|recommend|evaluating|considering|experience with|thinking about switching)/i.test(fullText);
                         if (!hasCommercial) {
                             diagFilteredSignals++;
                             return;
@@ -147,11 +147,9 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                 }
             }
 
-            log.info(`LinkedIn Forensic Debug [${company}]:`);
-            log.info(`LinkedIn raw Yahoo results: ${diagRawResults}`);
-            log.info(`LinkedIn parsed URLs: ${diagParsedUrls}`);
-            log.info(`LinkedIn filtered signals: ${diagFilteredSignals}`);
-            log.info(`LinkedIn final candidates: ${signals.length}`);
+            log.info(`LINKEDIN_RAW [${company}]: ${diagRawResults}`);
+            log.info(`LINKEDIN_AFTER_FILTER [${company}]: ${diagParsedUrls - diagFilteredSignals}`);
+            log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
 
             return signals;
         })

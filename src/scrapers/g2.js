@@ -38,8 +38,8 @@ export async function scrapeG2(companies, maxResults = 10) {
         companies.map(async (company) => {
             const signals = [];
 
-            // Dorking Yahoo for G2 reviews
-            const searchQuery = `site:g2.com/products/ "${company}" review (dislike OR alternatives OR switch OR expensive OR slow)`;
+            // Dorking Yahoo for G2 reviews (expanded for dissatisfaction)
+            const searchQuery = `site:g2.com/products/ "${company}" review (dislike OR alternative OR expensive OR slow OR pricing OR comparison OR missing feature OR frustrated)`;
             const url = `https://search.yahoo.com/search?p=${encodeURIComponent(searchQuery)}&n=${Math.min(maxResults + 5, 20)}`;
             
             log.info(`Scraping G2 Reviews (via Yahoo Dorking) for: ${company}`);
@@ -48,7 +48,11 @@ export async function scrapeG2(companies, maxResults = 10) {
                 const response = await axiosWithRetry({ method: 'GET', url });
                 const $ = cheerio.load(response.data);
 
+                let diagRawResults = 0;
+                let diagFilteredSignals = 0;
+
                 $('.algo').each((i, el) => {
+                    diagRawResults++;
                     if (signals.length >= maxResults) return;
 
                     const title = $(el).find('h3').text().trim();
@@ -57,9 +61,23 @@ export async function scrapeG2(companies, maxResults = 10) {
                     if (ruMatch) urlPath = decodeURIComponent(ruMatch[1]);
 
                     const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
+                    const fullText = (title + " " + snippet).toLowerCase();
 
-                    if (!title.toLowerCase().includes('review') && !snippet.toLowerCase().includes('review')) return;
-                    if (urlPath.includes('/compare/') || urlPath.includes('/category/')) return;
+                    if (!title.toLowerCase().includes('review') && !snippet.toLowerCase().includes('review')) {
+                        diagFilteredSignals++;
+                        return;
+                    }
+                    if (urlPath.includes('/compare/') || urlPath.includes('/category/')) {
+                        diagFilteredSignals++;
+                        return;
+                    }
+
+                    // Ensure dissatisfaction or comparison markers exist
+                    const hasDissatisfaction = /(pricing|expensive|too expensive|alternatives|comparison|vs|limitations|wish it had|missing feature|moving away|frustrated|support issues)/i.test(fullText);
+                    if (!hasDissatisfaction) {
+                        diagFilteredSignals++;
+                        return;
+                    }
 
                     signals.push({
                         company,
@@ -74,7 +92,9 @@ export async function scrapeG2(companies, maxResults = 10) {
                     });
                 });
 
-                log.info(`Collected ${signals.length} high-intent G2 reviews for ${company}`);
+                log.info(`G2_RAW [${company}]: ${diagRawResults}`);
+                log.info(`G2_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals}`);
+                log.info(`G2_FINAL [${company}]: ${signals.length}`);
             } catch (err) {
                 log.warning(`G2 scraping failed for ${company}`, { error: err.message });
             }

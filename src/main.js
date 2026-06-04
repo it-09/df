@@ -494,8 +494,8 @@ try {
         return (a.contentAgeDays || 0) - (b.contentAgeDays || 0);
     });
 
-    // 2. Apply hard caps per source
-    const sourceQuotas = { 'reddit': 5, 'linkedin': 5, 'g2': 4, 'hackernews': 3, 'github': 3 };
+    // 2. Apply hard caps per source based on diversity targets
+    const sourceQuotas = { 'reddit': 10, 'linkedin': 5, 'g2': 4, 'hackernews': 2, 'github': 1 };
     const sourceCounts = {};
     const truncatedSignals = [];
 
@@ -744,9 +744,10 @@ try {
     const finalBuyingSignalCount = Object.values(forensics.FINAL_PUSH_COUNTS).reduce((a,b)=>a+b, 0);
     
     // Phase 4: Source Diversity Assertion
-    const githubFinal = forensics.FINAL_PUSH_COUNTS['github'] || 0;
-    if (finalBuyingSignalCount > 0 && (githubFinal / finalBuyingSignalCount) > 0.70) {
-        log.warning('SOURCE_IMBALANCE_DETECTED: Dataset is heavily skewed toward GitHub.');
+    for (const [src, count] of Object.entries(forensics.FINAL_PUSH_COUNTS)) {
+        if (finalBuyingSignalCount > 0 && (count / finalBuyingSignalCount) > 0.80) {
+            log.warning(`SOURCE_IMBALANCE_WARNING: Dataset is heavily skewed toward ${src} (${Math.round((count/finalBuyingSignalCount)*100)}%).`);
+        }
     }
 
     const hasReddit = (forensics.FINAL_PUSH_COUNTS['reddit'] || 0) > 0;

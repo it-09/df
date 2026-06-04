@@ -41,6 +41,8 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
         companies.map(async (company) => {
             const signals = [];
             const query = encodeURIComponent(company);
+            let diagRawResults = 0;
+            let diagFilteredSignals = 0;
 
             try {
                 // Search stories
@@ -49,11 +51,30 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
 
                 if (response.data && response.data.hits) {
                     for (const hit of response.data.hits) {
+                        diagRawResults++;
+                        const title = hit.title || '';
+                        const content = stripHtml(hit.story_text || hit.comment_text || '').substring(0, 2000);
+                        const fullText = (title + " " + content).toLowerCase();
+
+                        // REJECT: technical architecture, open-source debates, benchmarking, engineering implementation noise
+                        const hasNoise = /(architecture|open-source|benchmarking|implementation|stack trace|ci\/cd|deployment|bug|issue|refactor)/i.test(fullText);
+                        if (hasNoise) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
+                        // ALLOW ONLY: commercial/evaluation threads
+                        const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
+                        if (!hasCommercial) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
                         signals.push({
                             company,
                             source: 'hackernews',
-                            title: hit.title || '',
-                            content: stripHtml(hit.story_text || hit.comment_text || '').substring(0, 2000),
+                            title,
+                            content,
                             url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
                             author: hit.author || 'unknown',
                             points: hit.points || 0,
@@ -74,11 +95,28 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
 
                 if (commentsResponse.data && commentsResponse.data.hits) {
                     for (const hit of commentsResponse.data.hits) {
+                        diagRawResults++;
+                        const title = `Comment on: ${hit.story_title || 'HN Thread'}`;
+                        const content = stripHtml(hit.comment_text || '').substring(0, 2000);
+                        const fullText = (title + " " + content).toLowerCase();
+
+                        const hasNoise = /(architecture|open-source|benchmarking|implementation|stack trace|ci\/cd|deployment|bug|issue|refactor)/i.test(fullText);
+                        if (hasNoise) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
+                        const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
+                        if (!hasCommercial) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
                         signals.push({
                             company,
                             source: 'hackernews',
-                            title: `Comment on: ${hit.story_title || 'HN Thread'}`,
-                            content: stripHtml(hit.comment_text || '').substring(0, 2000),
+                            title,
+                            content,
                             url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
                             author: hit.author || 'unknown',
                             createdAt: hit.created_at,
@@ -89,6 +127,10 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             } catch (err) {
                 log.warning(`HN comments error for ${company}`, { error: err.message });
             }
+
+            log.info(`HN_RAW [${company}]: ${diagRawResults}`);
+            log.info(`HN_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals}`);
+            log.info(`HN_FINAL [${company}]: ${signals.length}`);
 
             return signals;
         })
