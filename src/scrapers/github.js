@@ -52,8 +52,18 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                         const fullText = (title + " " + body).toLowerCase();
                         
                         // AGGRESSIVE TECHNICAL NOISE FILTERING
-                        const hasTechnicalNoise = /(rebranding|migration plan|epic|rename|schema|ci\/cd|bug|refactor|infrastructure|internal tooling|bronze|pipeline|deployment|api failure)/i.test(fullText);
-                        const hasCommercialIntent = /(alternative|switching|replacing|too expensive|fed up|migration|competitor|evaluating|comparison|vs|moving away from)/i.test(fullText);
+                        const mustContainOneOf = [
+                            "alternative", "switching", "replace", "moving away", "too expensive",
+                            "competitor", "vs", "pricing", "recommendation", "looking for"
+                        ];
+                        const rejectIfContains = [
+                            "rebranding", "migration plan", "epic", "rename", "schema", "ci/cd",
+                            "bug", "refactor", "infrastructure", "internal tooling", "bronze",
+                            "pipeline", "deployment", "api failure"
+                        ];
+
+                        const hasCommercialIntent = mustContainOneOf.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
+                        const hasTechnicalNoise = rejectIfContains.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
                         
                         // STRICT GATE: GitHub MUST contain strong commercial language AND must NOT contain hard-reject noise.
                         if (hasTechnicalNoise || !hasCommercialIntent) {

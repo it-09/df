@@ -588,6 +588,17 @@ try {
         if (signal.content && signal.content.length > 1500) {
             signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
         }
+        
+        // Phase 2: Hard Assertions - Check missing fields or bad titles
+        const badTitleCheck = /(artifact|hash|semantic|epic|rebranding|migration|internal)/i;
+        if (!signal.title || signal.title.toLowerCase().includes('undefined') || badTitleCheck.test(signal.title)) {
+            log.warning('INVALID_SIGNAL_REJECTED (Missing fields or bad title keywords)');
+            continue;
+        }
+        if (signal.intentScore === undefined || !signal.source || !signal.company || !signal.url) {
+            log.warning('INVALID_SIGNAL_REJECTED (Missing required schema fields)');
+            continue;
+        }
 
         itemsToPush.push(signal);
         forensics.FINAL_PUSH_COUNTS[signal.source] = (forensics.FINAL_PUSH_COUNTS[signal.source] || 0) + 1;
@@ -597,7 +608,19 @@ try {
         if (monitoringMode !== 'off') {
             const alert = generateSmartAlert(signal);
             if (alert) {
-                itemsToPush.push(alert);
+                // Map smart alert to dataset schema to prevent "undefined" rows
+                itemsToPush.push({
+                    company: alert.company,
+                    source: 'system_alert',
+                    title: `SMART ALERT: ${alert.type}`,
+                    content: alert.message,
+                    url: signal.url || 'none',
+                    intentScore: signal.intentScore,
+                    signalQuality: 'HIGH',
+                    leadPriority: 'HIGH',
+                    buyingStage: signal.buyingStage,
+                    whyHighIntent: alert.message
+                });
             }
         }
 
@@ -693,10 +716,19 @@ try {
     }
 
     const finalBuyingSignalCount = Object.values(forensics.FINAL_PUSH_COUNTS).reduce((a,b)=>a+b, 0);
-    const sourceDiversity = Object.keys(forensics.FINAL_PUSH_COUNTS).filter(k => forensics.FINAL_PUSH_COUNTS[k] > 0).length;
     
-    if (finalBuyingSignalCount < 3 || sourceDiversity < 2) {
-        log.warning('LOW_CONFIDENCE: Final dataset lacks volume or source diversity. Run returned low commercial intelligence.');
+    // Phase 4: Source Diversity Assertion
+    const githubFinal = forensics.FINAL_PUSH_COUNTS['github'] || 0;
+    if (finalBuyingSignalCount > 0 && (githubFinal / finalBuyingSignalCount) > 0.70) {
+        log.warning('SOURCE_IMBALANCE_DETECTED: Dataset is heavily skewed toward GitHub.');
+    }
+
+    const hasReddit = (forensics.FINAL_PUSH_COUNTS['reddit'] || 0) > 0;
+    const hasLinkedin = (forensics.FINAL_PUSH_COUNTS['linkedin'] || 0) > 0;
+    const hasG2 = (forensics.FINAL_PUSH_COUNTS['g2'] || 0) > 0;
+    
+    if (!hasReddit && !hasLinkedin && !hasG2) {
+        log.warning('LOW_CONFIDENCE: Missing essential non-developer sources (Reddit, LinkedIn, or G2). Run returned low commercial intelligence.');
     }
 
     await Actor.setStatusMessage(`Complete: ${finalBuyingSignalCount} signals, ${highIntentSignals.length} high-intent leads found.`, { isStatusMessageTerminal: true });
