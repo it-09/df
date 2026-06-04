@@ -37,64 +37,92 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const signals = [];
+            const seenUrls = new Set();
             
-            // Dorking Yahoo for LinkedIn posts
-            const searchQuery = `site:linkedin.com/posts "${company}" (alternative OR vs OR pricing OR switch OR replace OR frustrated)`;
-            const url = `https://search.yahoo.com/search?p=${encodeURIComponent(searchQuery)}&n=${Math.min(maxResults + 5, 20)}`;
-            
+            const queries = [
+                `"${company}"`,
+                `"${company}" recommendation`,
+                `"${company}" sales stack`,
+                `"${company}" alternatives`,
+                `"${company}" replacing`,
+                `"${company}" pricing`,
+                `"${company}" frustrated`,
+                `"${company}" moving away`
+            ];
+
             log.info(`Scraping LinkedIn (via Yahoo Dorking) for: ${company}`);
-            
-            try {
-                const response = await axiosWithRetry({ method: 'GET', url });
-                const $ = cheerio.load(response.data);
 
-                $('.algo').each((i, el) => {
-                    if (signals.length >= maxResults) return;
-                    
-                    const title = $(el).find('h3').text().trim();
-                    let urlPath = $(el).find('a').first().attr('href') || '';
-                    const ruMatch = urlPath.match(/\/RU=([^/]+)/);
-                    if (ruMatch) urlPath = decodeURIComponent(ruMatch[1]);
-                    
-                    const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
+            for (const q of queries) {
+                if (signals.length >= maxResults) break;
 
-                    // Skip non-post pages
-                    if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) return;
-                    if (!title && !snippet) return;
+                const searchQuery = `(site:linkedin.com/posts OR site:linkedin.com/feed/update) ${q}`;
+                const url = `https://search.yahoo.com/search?p=${encodeURIComponent(searchQuery)}&n=10`;
+                
+                try {
+                    const response = await axiosWithRetry({ method: 'GET', url });
+                    const $ = cheerio.load(response.data);
 
-                    // Extract author from title (e.g., "John Doe on LinkedIn: ...")
-                    let author = 'LinkedIn User';
-                    const authorMatch = title.match(/^(.*?)(?:\s+on\s+LinkedIn|\s+[-–—]\s+LinkedIn)/i);
-                    if (authorMatch && authorMatch[1]) {
-                        author = authorMatch[1].trim();
-                    }
+                    $('.algo').each((i, el) => {
+                        if (signals.length >= maxResults) return;
+                        
+                        const title = $(el).find('h3').text().trim();
+                        let urlPath = $(el).find('a').first().attr('href') || '';
+                        const ruMatch = urlPath.match(/\/RU=([^/]+)/);
+                        if (ruMatch) urlPath = decodeURIComponent(ruMatch[1]);
+                        
+                        const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
 
-                    // Extract job title from snippet if present
-                    let detectedRole = null;
-                    const roleMatch = snippet.match(/(?:^|\s)((?:CEO|CTO|VP|Director|Head|Manager|Lead|Founder|Co-Founder|Chief)[^.;,]*?)(?:\s+at\s+|\s+@\s+|\s+of\s+)/i);
-                    if (roleMatch) {
-                        detectedRole = roleMatch[1].trim();
-                    }
+                        // Skip non-post pages
+                        if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) return;
+                        if (!title && !snippet) return;
 
-                    signals.push({
-                        company,
-                        source: 'linkedin',
-                        title: title || `LinkedIn Post: ${company}`,
-                        content: snippet,
-                        url: urlPath,
-                        author,
-                        subreddit: 'linkedin_posts',
-                        detectedRole: detectedRole,
-                        createdAt: new Date().toISOString(),
-                        scrapedAt: new Date().toISOString()
+                        // Deduplication by URL
+                        if (seenUrls.has(urlPath)) return;
+                        seenUrls.add(urlPath);
+
+                        // Extract author from title
+                        let author = 'LinkedIn User';
+                        const authorMatch = title.match(/^(.*?)(?:\s+on\s+LinkedIn|\s+[-–—]\s+LinkedIn)/i);
+                        if (authorMatch && authorMatch[1]) {
+                            author = authorMatch[1].trim();
+                        }
+
+                        // Extract job title from snippet if present
+                        let detectedRole = null;
+                        const roleMatch = snippet.match(/(?:^|\s)((?:CEO|CTO|VP|Director|Head|Manager|Lead|Founder|Co-Founder|Chief|RevOps|Sales Ops|Marketing Ops|GTM)[^.;,]*?)(?:\s+at\s+|\s+@\s+|\s+of\s+)/i);
+                        if (roleMatch) {
+                            detectedRole = roleMatch[1].trim();
+                        }
+
+                        const fullText = (title + " " + snippet).toLowerCase();
+
+                        // NOISE REJECTION: Skip hiring, product announcements, company bragging
+                        if (/(hiring|thrilled to announce|excited to share|join our team|we are hiring|product update|new feature|i am thrilled|we are excited)/i.test(fullText)) {
+                            return;
+                        }
+
+                        signals.push({
+                            company,
+                            source: 'linkedin',
+                            title: title || `LinkedIn Post: ${company}`,
+                            content: snippet,
+                            url: urlPath,
+                            author,
+                            subreddit: 'linkedin_posts',
+                            detectedRole: detectedRole,
+                            createdAt: new Date().toISOString(),
+                            scrapedAt: new Date().toISOString()
+                        });
                     });
-                });
-
-                log.info(`Collected ${signals.length} high-intent LinkedIn posts for ${company}`);
-            } catch (err) {
-                log.warning(`LinkedIn scraping failed for ${company}`, { error: err.message });
+                    
+                    // Small delay to avoid hammering Yahoo
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (err) {
+                    log.debug(`LinkedIn dork query failed for ${company} -> ${q}`);
+                }
             }
 
+            log.info(`Collected ${signals.length} high-intent LinkedIn posts for ${company}`);
             return signals;
         })
     );

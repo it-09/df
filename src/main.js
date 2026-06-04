@@ -459,8 +459,54 @@ try {
         }
     }
 
-    const qualifiedCount = enrichedSignals.filter(s => s.signalQuality !== 'REJECT').length;
-    log.info('Signal enrichment complete');
+    // --- SOURCE QUALITY RECOVERY SPRINT: TASK 4 (Source Diversity Quotas) ---
+    // 1. Sort signals intelligently
+    const stageVal = { 'decision': 4, 'evaluation': 3, 'consideration': 2, 'awareness': 1, 'none': 0 };
+    enrichedSignals.sort((a, b) => {
+        // 1. Strongest intent score
+        if (b.intentScore !== a.intentScore) return b.intentScore - a.intentScore;
+        // 2. Switching signals
+        const aSwitch = a.switchSignals?.switchingDetected ? 1 : 0;
+        const bSwitch = b.switchSignals?.switchingDetected ? 1 : 0;
+        if (bSwitch !== aSwitch) return bSwitch - aSwitch;
+        // 3. Pricing pain
+        const aPrice = a.painSignals?.painTypes?.includes('pricing') ? 1 : 0;
+        const bPrice = b.painSignals?.painTypes?.includes('pricing') ? 1 : 0;
+        if (bPrice !== aPrice) return bPrice - aPrice;
+        // 4. Buying stage
+        const aStage = stageVal[a.buyingStage] || 0;
+        const bStage = stageVal[b.buyingStage] || 0;
+        if (bStage !== aStage) return bStage - aStage;
+        // 5. Freshness
+        return (a.contentAgeDays || 0) - (b.contentAgeDays || 0);
+    });
+
+    // 2. Apply hard caps per source
+    const sourceQuotas = { 'reddit': 5, 'linkedin': 5, 'g2': 4, 'hackernews': 3, 'github': 3 };
+    const sourceCounts = {};
+    const truncatedSignals = [];
+
+    for (const signal of enrichedSignals) {
+        if (signal.signalQuality === 'REJECT') continue; // Drop rejects early
+        
+        const src = signal.source;
+        if (!sourceCounts[src]) sourceCounts[src] = 0;
+        
+        if (sourceCounts[src] < (sourceQuotas[src] || 5)) {
+            truncatedSignals.push(signal);
+            sourceCounts[src]++;
+        } else {
+            log.debug(`Truncated signal from ${src} due to source diversity quota.`);
+        }
+    }
+    
+    // Replace enrichedSignals with the truncated, balanced subset
+    enrichedSignals.length = 0;
+    enrichedSignals.push(...truncatedSignals);
+    // --- END SOURCE DIVERSITY QUOTAS ---
+
+    const qualifiedCount = enrichedSignals.length;
+    log.info(`Signal enrichment complete. Balanced dataset contains ${qualifiedCount} signals.`);
     await Actor.setStatusMessage(`Qualified ${qualifiedCount} high-intent leads. Generating insights...`);
 
     // Push individual signals to dataset + charge per signal (H3: PPE)

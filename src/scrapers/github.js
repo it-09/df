@@ -47,11 +47,23 @@ export async function scrapeGitHub(companies, maxResults = 10) {
 
                 if (response.data && response.data.items) {
                     for (const item of response.data.items) {
+                        const title = item.title || '';
+                        const body = (item.body || '').substring(0, 2000);
+                        const fullText = (title + " " + body).toLowerCase();
+                        
+                        // AGGRESSIVE TECHNICAL NOISE FILTERING
+                        const hasTechnicalNoise = /(bug|issue|pr|pull request|schema|migration|bronze|pipeline|validation|benchmark|fix|time drift|connector|deployment|test failure|internal tooling)/i.test(fullText);
+                        const hasCommercialIntent = /(alternatives|switching|moving away|frustrat|pricing|recommendation|vs|comparison|better than|replace|evaluation)/i.test(fullText);
+                        
+                        if (hasTechnicalNoise && !hasCommercialIntent) {
+                            continue; // Drop engineering chatter
+                        }
+
                         signals.push({
                             company,
                             source: 'github',
-                            title: item.title,
-                            content: (item.body || '').substring(0, 2000),
+                            title: title,
+                            content: body,
                             url: item.html_url,
                             author: item.user?.login || 'unknown',
                             repository: item.repository_url?.split('/').slice(-2).join('/') || '',
