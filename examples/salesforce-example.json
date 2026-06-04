@@ -1,0 +1,40 @@
+{
+  "executiveSummary": {
+    "topRisk": "Users report migration frustration and legacy UX complaints.",
+    "switchingSignals": "2 active competitor switching signals detected.",
+    "urgentAccounts": "2 high-confidence opportunities.",
+    "buyingStageBreakdown": {
+      "awareness": 0,
+      "consideration": 1,
+      "evaluation": 2,
+      "decision": 0
+    },
+    "topPainThemes": [
+      "workflow",
+      "migration",
+      "technical"
+    ],
+    "recommendedOutreach": "Lead with implementation simplicity and developer experience.",
+    "competitivePressure": "High mentions of HubSpot as alternative/competitor.",
+    "sourceMix": {
+      "g2": 60,
+      "linkedin": 40
+    },
+    "confidenceSummary": {
+      "averageIntentScore": 82,
+      "averageConfidence": 0.85
+    }
+  },
+  "signals": [
+    {
+      "company": "Salesforce",
+      "source": "linkedin",
+      "title": "Moving away from Salesforce, need recommendations.",
+      "intentScore": 88,
+      "buyingStage": "Evaluation",
+      "whyHighIntent": "Prospect is actively soliciting recommendations for a CRM switch due to workflow complexity.",
+      "leadPriority": "HIGH",
+      "recommendedOutreachAngle": "Lead with implementation simplicity and modern UX."
+    }
+  ]
+}

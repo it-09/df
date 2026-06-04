@@ -2,7 +2,7 @@
     "name": "dark-funnel-intelligence-engine",
     "version": "1.0.0",
     "type": "module",
-    "description": "B2B Buying Intent Signal Tracker — surface dark funnel signals from Reddit, GitHub, Hacker News, and News.",
+    "description": "Detect competitor switching, pricing pain, migration planning, and buyer intent across Reddit, LinkedIn, G2, HackerNews, and GitHub.",
     "engines": {
         "node": ">=20.0.0"
     },
