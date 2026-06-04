@@ -25,59 +25,69 @@ async function axiosWithRetry(config, retries = 3) {
 }
 
 /**
- * Scrape Reddit using native boolean search on old.reddit.com
+ * Scrape Reddit posts using Yahoo Search Dorking.
+ * Yahoo Search bypasses Reddit's strict datacenter IP blocks natively.
+ * Zero API keys required.
+ * 
  * @param {string[]} companies - Companies to search for
  * @param {number} maxResults - Maximum results per company
  * @returns {Promise<Array>} - Array of Reddit signals
  */
-export async function scrapeReddit(companies, maxResults = 50) {
+export async function scrapeReddit(companies, maxResults = 10) {
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const signals = [];
             
-            // Boolean logic offloads the filtering to Reddit!
-            // We search globally, but force a high commercial-intent context
-            const searchQuery = `"${company}" AND (alternative OR vs OR pricing OR replace OR recommendation OR migrate OR expensive)`;
-            const url = `https://old.reddit.com/search?q=${encodeURIComponent(searchQuery)}&sort=new&t=year`;
+            // Dorking Yahoo for Reddit posts
+            const searchQuery = `site:reddit.com "${company}" (alternative OR vs OR pricing OR switch OR replace OR frustrated)`;
+            const url = `https://search.yahoo.com/search?p=${encodeURIComponent(searchQuery)}&n=${Math.min(maxResults + 5, 20)}`;
             
-            log.info(`Scraping Reddit (Native) for: ${company}`);
+            log.info(`Scraping Reddit (via Yahoo Dorking) for: ${company}`);
             
             try {
                 const response = await axiosWithRetry({ method: 'GET', url });
                 const $ = cheerio.load(response.data);
-                
-                $('.search-result-link').each((i, el) => {
+
+                $('.algo').each((i, el) => {
                     if (signals.length >= maxResults) return;
                     
-                    const title = $(el).find('.search-title').text().trim();
-                    const urlPath = $(el).find('.search-title').attr('href');
-                    const author = $(el).find('.author').text().trim();
-                    const subreddit = $(el).find('.search-subreddit-link').text().trim();
-                    const timeStr = $(el).find('.search-time time').attr('datetime');
+                    const title = $(el).find('h3').text().trim();
+                    let urlPath = $(el).find('a').first().attr('href') || '';
                     
-                    // We extract the snippet to fuel our intent scoring engine
-                    const snippet = $(el).find('.search-result-body').text().trim();
+                    // Extract actual URL from Yahoo tracking link
+                    const ruMatch = urlPath.match(/\/RU=([^/]+)/);
+                    if (ruMatch) urlPath = decodeURIComponent(ruMatch[1]);
                     
+                    const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
+
+                    if (!urlPath.includes('/comments/')) return;
                     if (!title && !snippet) return;
-                    
+
+                    // Extract subreddit from URL
+                    let subreddit = 'reddit_user';
+                    const subMatch = urlPath.match(/\/r\/([^/]+)/i);
+                    if (subMatch && subMatch[1]) {
+                        subreddit = `r/${subMatch[1]}`;
+                    }
+
                     signals.push({
                         company,
                         source: 'reddit',
-                        title: title || '',
-                        content: snippet || '',
-                        url: urlPath ? (urlPath.startsWith('http') ? urlPath : `https://old.reddit.com${urlPath}`) : url,
-                        author: author || 'unknown',
-                        subreddit: subreddit || '',
-                        createdAt: timeStr || new Date().toISOString(),
+                        title: title || `Reddit Post: ${company}`,
+                        content: snippet,
+                        url: urlPath,
+                        author: 'Reddit User',
+                        subreddit: subreddit,
+                        createdAt: new Date().toISOString(),
                         scrapedAt: new Date().toISOString()
                     });
                 });
-                
-                log.info(`Collected ${signals.length} highly targeted Reddit signals for ${company}`);
+
+                log.info(`Collected ${signals.length} high-intent Reddit posts for ${company}`);
             } catch (err) {
-                log.warning(`Reddit native scraper failed for ${company}`, { error: err.message });
+                log.warning(`Reddit scraping failed for ${company}`, { error: err.message });
             }
-            
+
             return signals;
         })
     );
