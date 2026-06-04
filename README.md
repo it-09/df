@@ -135,7 +135,7 @@ Because the Stage 1 & 2 heuristics aggressively filter out 85%+ of noise, the LL
 
 ## 🧠 Technical Architecture
 
-```mermaid
+```text
 graph TD
     A["Signal Collection<br/>Reddit, LinkedIn, G2, GitHub"] -->|Raw Data| B("Stage 1: Fast Heuristics")
     B -->|Filter Spam / Bots| C("Stage 2: Source Weighting")
