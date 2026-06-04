@@ -18,5 +18,16 @@
       "write": true
     }
   },
+  "pricing": {
+    "payPerEvent": {
+      "events": {
+        "result-signal": {
+          "title": "High-Intent Lead Processed",
+          "description": "A fully qualified, high-intent CRM-ready lead.",
+          "eventPriceUsd": 0.10
+        }
+      }
+    }
+  },
   "dockerfile": "../Dockerfile"
 }

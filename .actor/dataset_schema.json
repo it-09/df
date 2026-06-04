@@ -124,8 +124,7 @@
                 "description": "Whether this signal was seen for the first time in this run (monitoring mode).",
                 "example": true
             }
-        },
-        "required": ["company", "source", "intentScore", "signalQuality"]
+        }
     },
     "views": {
         "signals": {
