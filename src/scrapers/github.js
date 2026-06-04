@@ -52,11 +52,12 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                         const fullText = (title + " " + body).toLowerCase();
                         
                         // AGGRESSIVE TECHNICAL NOISE FILTERING
-                        const hasTechnicalNoise = /(bug|issue|pr|pull request|schema|migration|bronze|pipeline|validation|benchmark|fix|time drift|connector|deployment|test failure|internal tooling)/i.test(fullText);
-                        const hasCommercialIntent = /(alternatives|switching|moving away|frustrat|pricing|recommendation|vs|comparison|better than|replace|evaluation)/i.test(fullText);
+                        const hasTechnicalNoise = /(bug|issue|pull request|pr|schema|migration|connector|validation|benchmark|deployment|pipeline|bronze|silver|gold table|etl|data drift|time drift|fix|regression|stack trace|ci\/cd|yaml|docker|config|internal tooling|api failure|test failure|sdk|dependency|version mismatch)/i.test(fullText);
+                        const hasCommercialIntent = /(alternatives|switching from|moving away|replace|replacing|fed up|frustrated with|recommendation|better than|vs|comparison|pricing|too expensive|looking for|evaluating|migration away|leaving)/i.test(fullText);
                         
-                        if (hasTechnicalNoise && !hasCommercialIntent) {
-                            continue; // Drop engineering chatter
+                        // STRICT GATE: GitHub MUST contain strong commercial language.
+                        if (!hasCommercialIntent) {
+                            continue; 
                         }
 
                         signals.push({

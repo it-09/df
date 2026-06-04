@@ -40,29 +40,35 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             const seenUrls = new Set();
             
             const queries = [
-                `"${company}"`,
-                `"${company}" recommendation`,
-                `"${company}" sales stack`,
-                `"${company}" alternatives`,
-                `"${company}" replacing`,
-                `"${company}" pricing`,
-                `"${company}" frustrated`,
-                `"${company}" moving away`
+                `site:linkedin.com/posts "${company}" alternatives`,
+                `site:linkedin.com/posts "${company}" recommendation`,
+                `site:linkedin.com/posts "${company}" pricing`,
+                `site:linkedin.com/posts "${company}" vs`,
+                `site:linkedin.com/posts "${company}" switching`,
+                `site:linkedin.com/posts CRM recommendation`,
+                `site:linkedin.com/posts sales stack`,
+                `site:linkedin.com/posts marketing automation alternatives`,
+                `site:linkedin.com/posts GTM stack`,
+                `site:linkedin.com/posts revops tools`
             ];
 
             log.info(`Scraping LinkedIn (via Yahoo Dorking) for: ${company}`);
+            
+            let diagRawResults = 0;
+            let diagParsedUrls = 0;
+            let diagFilteredSignals = 0;
 
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
 
-                const searchQuery = `(site:linkedin.com/posts OR site:linkedin.com/feed/update) ${q}`;
-                const url = `https://search.yahoo.com/search?p=${encodeURIComponent(searchQuery)}&n=10`;
+                const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}&n=10`;
                 
                 try {
                     const response = await axiosWithRetry({ method: 'GET', url });
                     const $ = cheerio.load(response.data);
 
                     $('.algo').each((i, el) => {
+                        diagRawResults++;
                         if (signals.length >= maxResults) return;
                         
                         const title = $(el).find('h3').text().trim();
@@ -73,11 +79,21 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                         const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
 
                         // Skip non-post pages
-                        if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) return;
-                        if (!title && !snippet) return;
+                        if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) {
+                            diagFilteredSignals++;
+                            return;
+                        }
+                        if (!title && !snippet) {
+                            diagFilteredSignals++;
+                            return;
+                        }
+                        diagParsedUrls++;
 
                         // Deduplication by URL
-                        if (seenUrls.has(urlPath)) return;
+                        if (seenUrls.has(urlPath)) {
+                            diagFilteredSignals++;
+                            return;
+                        }
                         seenUrls.add(urlPath);
 
                         // Extract author from title
@@ -96,8 +112,17 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
 
                         const fullText = (title + " " + snippet).toLowerCase();
 
-                        // NOISE REJECTION: Skip hiring, product announcements, company bragging
-                        if (/(hiring|thrilled to announce|excited to share|join our team|we are hiring|product update|new feature|i am thrilled|we are excited)/i.test(fullText)) {
+                        // NOISE REJECTION: Hard reject fluffy/hiring/corporate posts
+                        const isNoise = /(hiring|job opening|we are hiring|conference|event|webinar|company announcement|product launch|employee celebration|fundraising|thought leadership fluff)/i.test(fullText);
+                        if (isNoise) {
+                            diagFilteredSignals++;
+                            return;
+                        }
+
+                        // COMMERCIAL BOOST: Must have commercial intent to be a quality signal (optional strict gate depending on needs, but we'll score it implicitly by keeping it)
+                        const hasCommercial = /(recommendation|alternatives|switching|moving away|replace|vendor|evaluation|pricing|CRM stack|sales stack|pain|frustrated|procurement|tool selection)/i.test(fullText);
+                        if (!hasCommercial) {
+                            diagFilteredSignals++;
                             return;
                         }
 
@@ -122,7 +147,12 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                 }
             }
 
-            log.info(`Collected ${signals.length} high-intent LinkedIn posts for ${company}`);
+            log.info(`LinkedIn Forensic Debug [${company}]:`);
+            log.info(`LinkedIn raw Yahoo results: ${diagRawResults}`);
+            log.info(`LinkedIn parsed URLs: ${diagParsedUrls}`);
+            log.info(`LinkedIn filtered signals: ${diagFilteredSignals}`);
+            log.info(`LinkedIn final candidates: ${signals.length}`);
+
             return signals;
         })
     );

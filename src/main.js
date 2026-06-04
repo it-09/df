@@ -569,6 +569,12 @@ try {
             signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
         }
 
+        // Task 3: Remove Malformed Dataset Rows
+        if (!signal || !signal.title || !signal.source || !signal.company) {
+            log.warning('Dropped malformed signal before pushing to dataset');
+            continue;
+        }
+
         itemsToPush.push(signal);
         chargedSignals++;
 
