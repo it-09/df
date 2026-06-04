@@ -36,6 +36,8 @@ async function axiosWithRetry(config, retries = 3) {
 export async function scrapeG2(companies, maxResults = 10) {
     const results = await Promise.allSettled(
         companies.map(async (company) => {
+            const companyStart = Date.now();
+            log.info(`G2_START [${company}]`);
             const signals = [];
 
             // Dorking Yahoo for G2 reviews (expanded for dissatisfaction)
@@ -127,6 +129,11 @@ export async function scrapeG2(companies, maxResults = 10) {
             } catch (err) {
                 log.warning(`G2 scraping failed for ${company}`, { error: err.message });
             }
+
+            log.info(`G2_FILTERED [${company}]: ${signals.length}`);
+            const companyDuration = Date.now() - companyStart;
+            log.info(`G2_END [${company}]`);
+            log.info(`G2_DURATION_MS [${company}]: ${companyDuration}`);
 
             return signals;
         })

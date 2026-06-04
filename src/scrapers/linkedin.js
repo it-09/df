@@ -68,6 +68,8 @@ const ALLOW_PATTERNS = [
 export async function scrapeLinkedIn(companies, maxResults = 10) {
     const results = await Promise.allSettled(
         companies.map(async (company) => {
+            const companyStart = Date.now();
+            log.info(`LINKEDIN_START [${company}]`);
             const signals = [];
             const seenUrls = new Set();
             
@@ -187,6 +189,10 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             log.info(`LINKEDIN_NOISE_REJECTED [${company}]: ${diagNoiseRejected}`);
             log.info(`LINKEDIN_COMMERCIAL_PASS [${company}]: ${diagCommercialPass}`);
             log.info(`LINKEDIN_LOW_CONFIDENCE [${company}]: ${diagLowConfidence}`);
+            log.info(`LINKEDIN_FILTERED [${company}]: ${signals.length}`);
+            const companyDuration = Date.now() - companyStart;
+            log.info(`LINKEDIN_END [${company}]`);
+            log.info(`LINKEDIN_DURATION_MS [${company}]: ${companyDuration}`);
             log.info(`LINKEDIN_FINAL [${company}]: ${signals.length}`);
 
             return signals;

@@ -39,6 +39,8 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
     // M1: Parallelize across companies
     const results = await Promise.allSettled(
         companies.map(async (company) => {
+            const companyStart = Date.now();
+            log.info(`HN_START [${company}]`);
             const signals = [];
             const query = encodeURIComponent(company);
             let diagRawResults = 0;
@@ -169,6 +171,10 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             log.info(`HN_RAW [${company}]: ${diagRawResults}`);
             log.info(`HN_SPAM_REJECTED [${company}]: ${diagSpamRejected}`);
             log.info(`HN_AFTER_FILTER [${company}]: ${diagRawResults - diagFilteredSignals - diagSpamRejected}`);
+            log.info(`HN_FILTERED [${company}]: ${signals.length}`);
+            const companyDuration = Date.now() - companyStart;
+            log.info(`HN_END [${company}]`);
+            log.info(`HN_DURATION_MS [${company}]: ${companyDuration}`);
             log.info(`HN_FINAL [${company}]: ${signals.length}`);
 
             return signals;

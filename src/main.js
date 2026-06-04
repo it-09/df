@@ -184,11 +184,15 @@ if (monitoringMode !== 'off') {
 }
 
 try {
+    const pipelineTimings = {};
+
     // 1. Scrape Reddit (using Apify actor chaining)
     if (resolvedSources.reddit) {
         try {
             log.info('Scraping Reddit...');
+            const t0 = Date.now();
             const redditSignals = await scrapeReddit(validCompanies, maxResults);
+            pipelineTimings.reddit = Date.now() - t0;
             allSignals.push(...redditSignals);
             log.info(`Reddit: ${redditSignals.length} signals collected`);
         } catch (redditError) {
@@ -199,7 +203,9 @@ try {
     // 2. Scrape GitHub
     if (resolvedSources.github) {
         log.info('Scraping GitHub...');
+        const t0 = Date.now();
         const githubSignals = await scrapeGitHub(validCompanies, maxResults);
+        pipelineTimings.github = Date.now() - t0;
         allSignals.push(...githubSignals);
         log.info(`GitHub: ${githubSignals.length} signals collected`);
     }
@@ -207,7 +213,9 @@ try {
     // 3. Scrape Hacker News
     if (resolvedSources.hackernews) {
         log.info('Scraping Hacker News...');
+        const t0 = Date.now();
         const hnSignals = await scrapeHackerNews(validCompanies, maxResults);
+        pipelineTimings.hackernews = Date.now() - t0;
         allSignals.push(...hnSignals);
         log.info(`Hacker News: ${hnSignals.length} signals collected`);
     }
@@ -215,7 +223,9 @@ try {
     // 4. Scrape News (optional)
     if (resolvedSources.news && newsApiKey) {
         log.info('Scraping News...');
+        const t0 = Date.now();
         const newsSignals = await scrapeNews(validCompanies, newsApiKey, maxResults);
+        pipelineTimings.news = Date.now() - t0;
         allSignals.push(...newsSignals);
         log.info(`News: ${newsSignals.length} signals collected`);
     }
@@ -223,7 +233,9 @@ try {
     // 5. Scrape G2 Reviews
     if (resolvedSources.g2) {
         log.info('Scraping G2 Reviews...');
+        const t0 = Date.now();
         const g2Signals = await scrapeG2(validCompanies, maxResults);
+        pipelineTimings.g2 = Date.now() - t0;
         allSignals.push(...g2Signals);
         log.info(`G2: ${g2Signals.length} signals collected`);
     }
@@ -231,10 +243,26 @@ try {
     // 6. Scrape LinkedIn
     if (resolvedSources.linkedin) {
         log.info('Scraping LinkedIn...');
+        const t0 = Date.now();
         const linkedInSignals = await scrapeLinkedIn(validCompanies, maxResults);
+        pipelineTimings.linkedin = Date.now() - t0;
         allSignals.push(...linkedInSignals);
         log.info(`LinkedIn: ${linkedInSignals.length} signals collected`);
     }
+
+    // --- PIPELINE TIMING SUMMARY ---
+    log.info('--- PIPELINE_TIMING_SUMMARY ---');
+    let totalScrapeMs = 0;
+    for (const [src, ms] of Object.entries(pipelineTimings)) {
+        log.info(`  ${src}: ${ms}ms (${(ms / 1000).toFixed(1)}s)`);
+        totalScrapeMs += ms;
+    }
+    log.info(`  TOTAL_SCRAPE_TIME: ${totalScrapeMs}ms (${(totalScrapeMs / 1000).toFixed(1)}s)`);
+    if (totalScrapeMs > 0) {
+        const sorted = Object.entries(pipelineTimings).sort((a, b) => b[1] - a[1]);
+        log.info(`  SLOWEST_SOURCE: ${sorted[0][0]} (${sorted[0][1]}ms — ${Math.round((sorted[0][1] / totalScrapeMs) * 100)}% of total)`);
+    }
+    log.info('-------------------------------');
 
     log.info(`Total raw signals collected: ${allSignals.length}`);
     await Actor.setStatusMessage(`Collected ${allSignals.length} raw signals. Running NLP analysis...`);

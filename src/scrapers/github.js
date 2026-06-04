@@ -31,7 +31,10 @@ export async function scrapeGitHub(companies, maxResults = 10) {
     // M1: Parallelize across companies
     const results = await Promise.allSettled(
         companies.map(async (company) => {
+            const companyStart = Date.now();
+            log.info(`GITHUB_START [${company}]`);
             const signals = [];
+            let rawCount = 0;
             try {
                 const query = encodeURIComponent(`${company} in:title,body type:issue`);
                 const url = `https://api.github.com/search/issues?q=${query}&sort=created&order=desc&per_page=${perPage}`;
@@ -46,6 +49,7 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                 });
 
                 if (response.data && response.data.items) {
+                    rawCount = response.data.items.length;
                     for (const item of response.data.items) {
                         const title = item.title || '';
                         const body = (item.body || '').substring(0, 2000);
@@ -86,6 +90,11 @@ export async function scrapeGitHub(companies, maxResults = 10) {
             } catch (err) {
                 log.warning(`GitHub scraping error for ${company}`, { error: err.message });
             }
+            log.info(`GITHUB_RAW [${company}]: ${rawCount}`);
+            log.info(`GITHUB_FILTERED [${company}]: ${signals.length}`);
+            const companyDuration = Date.now() - companyStart;
+            log.info(`GITHUB_END [${company}]`);
+            log.info(`GITHUB_DURATION_MS [${company}]: ${companyDuration}`);
             return signals;
         })
     );
