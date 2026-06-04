@@ -531,7 +531,8 @@ try {
 
     // Push individual signals to dataset + charge per signal (H3: PPE)
     let chargedSignals = 0;
-    const itemsToPush = [];
+    const buyingSignals = [];
+    const smartAlerts = [];
     
     for (const signal of enrichedSignals) {
         // --- COMMERCIAL READINESS POLISH SPRINT: TASK 1 (Freshness Filtering) ---
@@ -600,7 +601,7 @@ try {
             continue;
         }
 
-        itemsToPush.push(signal);
+        buyingSignals.push(signal);
         forensics.FINAL_PUSH_COUNTS[signal.source] = (forensics.FINAL_PUSH_COUNTS[signal.source] || 0) + 1;
         chargedSignals++;
 
@@ -608,18 +609,18 @@ try {
         if (monitoringMode !== 'off') {
             const alert = generateSmartAlert(signal);
             if (alert) {
-                // Map smart alert to dataset schema to prevent "undefined" rows
-                itemsToPush.push({
+                // HARD SEPARATION: Push to smartAlerts array instead of buyingSignals
+                smartAlerts.push({
                     company: alert.company,
-                    source: 'system_alert',
                     title: `SMART ALERT: ${alert.type}`,
-                    content: alert.message,
-                    url: signal.url || 'none',
-                    intentScore: signal.intentScore,
-                    signalQuality: 'HIGH',
-                    leadPriority: 'HIGH',
-                    buyingStage: signal.buyingStage,
-                    whyHighIntent: alert.message
+                    source: "system",
+                    url: "",
+                    intentScore: 0,
+                    leadPriority: "INFO",
+                    signalQuality: "SYSTEM",
+                    buyingStage: "monitoring",
+                    whyHighIntent: alert.message,
+                    recommendedOutreachAngle: ""
                 });
             }
         }
@@ -634,11 +635,34 @@ try {
         }
     }
     
-    if (itemsToPush.length > 0) {
-        const payloadSizeKB = (Buffer.byteLength(JSON.stringify(itemsToPush), 'utf8') / 1024).toFixed(2);
+    // 2. SCHEMA ENFORCEMENT & 4. ASSERTION
+    const finalRows = buyingSignals.filter(signal =>
+        signal &&
+        signal.title &&
+        signal.company &&
+        signal.source &&
+        signal.url &&
+        typeof signal.intentScore === 'number'
+    );
+
+    if (finalRows.length !== buyingSignals.length) {
+        log.warning(`INVALID_SIGNAL_REJECTED: Dropped ${buyingSignals.length - finalRows.length} invalid signals just before dataset push.`);
+    }
+
+    const isValid = finalRows.every(r => r.title && r.company && r.source);
+    if (!isValid) {
+        log.warning('ASSERTION FAILED: Invalid rows detected in final array. Skipping invalid rows.');
+    } else if (finalRows.length > 0) {
+        const payloadSizeKB = (Buffer.byteLength(JSON.stringify(finalRows), 'utf8') / 1024).toFixed(2);
         log.info(`Serialized payload size: ${payloadSizeKB} KB`);
-        await pushDataToApify(itemsToPush, 'signals');
-        log.info('Dataset persistence complete.');
+        await pushDataToApify(finalRows, 'signals');
+        log.info('Dataset persistence complete (Buying Signals).');
+    }
+    
+    // Save smart alerts to Key-Value Store instead of Dataset
+    if (smartAlerts.length > 0) {
+        await Actor.setValue('SMART_ALERTS', smartAlerts);
+        log.info(`Saved ${smartAlerts.length} smart alerts to Key-Value Store.`);
     }
 
     // Generate aggregated insights
@@ -696,8 +720,10 @@ try {
     
     const aggregatedPayloadSizeKB = (Buffer.byteLength(JSON.stringify(aggregatedItems), 'utf8') / 1024).toFixed(2);
     log.info(`Serialized payload size: ${aggregatedPayloadSizeKB} KB`);
-    await pushDataToApify(aggregatedItems, 'aggregated insights');
-    log.info('Dataset persistence complete.');
+    
+    // HARD SEPARATION: Push aggregated insights to Key-Value store to avoid mixing schemas in Dataset
+    await Actor.setValue('AGGREGATED_INSIGHTS', aggregatedItems);
+    log.info('Aggregated insights persistence complete (Key-Value Store).');
 
     log.info('Dark Funnel Intelligence Engine completed successfully', {
         totalSignals: enrichedSignals.length,
