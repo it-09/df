@@ -136,15 +136,19 @@ Because the Stage 1 & 2 heuristics aggressively filter out 85%+ of noise, the LL
 ## 🧠 Technical Architecture
 
 ```text
-graph TD
-    A["Signal Collection<br/>Reddit, LinkedIn, G2, GitHub"] -->|Raw Data| B("Stage 1: Fast Heuristics")
-    B -->|Filter Spam / Bots| C("Stage 2: Source Weighting")
-    C -->|Score Intent| D{"Threshold Gate"}
-    D -->|Score < 40| E["Discarded / Low Priority"]
-    D -->|Score >= 40| F["Stage 3: LLM Truth Layer"]
-    F -->|Reject False Positive| E
-    F -->|Confirm Genuine Buyer| G["Stage 4: CRM Intelligence"]
-    G --> H(("CRM Ready Lead"))
+1. Signal Collection (Reddit, LinkedIn, G2, GitHub)
+   ↓ Raw Data
+2. Stage 1: Fast Heuristics
+   ↓ Filter Spam / Bots
+3. Stage 2: Source Weighting
+   ↓ Score Intent
+4. Threshold Gate
+   ├─ [Score < 40] ──► Discarded / Low Priority
+   └─ [Score >= 40] ─► Stage 3: LLM Truth Layer
+                       ├─ [Reject False Positive] ──► Discarded / Low Priority
+                       └─ [Confirm Genuine Buyer] ──► Stage 4: CRM Intelligence
+                                                      ↓
+                                                CRM Ready Lead
 ```
 
 ### Key Technologies
