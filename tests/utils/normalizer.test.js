@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fuzzyMatchCompany, cleanText, simpleHash, deduplicateSignals, calculateConfidence } from '../../src/utils/normalizer.js';
+import { fuzzyMatchCompany, cleanText, simpleHash, deduplicateSignals, calculateConfidence, parseSnippetDate, estimateRedditPostDate, estimateLinkedInPostDate, estimateG2ReviewDate, parseOrEstimatePostDate } from '../../src/utils/normalizer.js';
 
 describe('normalizer utility', () => {
     describe('fuzzyMatchCompany', () => {
@@ -65,6 +65,86 @@ describe('normalizer utility', () => {
                 buyingSignals: { confidence: 0.8 }
             };
             expect(calculateConfidence(signal)).toBeCloseTo(1.0);
+        });
+    });
+
+    describe('parseSnippetDate', () => {
+        it('should return null for empty or dateless snippet', () => {
+            expect(parseSnippetDate('')).toBeNull();
+            expect(parseSnippetDate('HubSpot announced alternatives today.')).toBeNull();
+        });
+
+        it('should parse relative days', () => {
+            const dateStr = parseSnippetDate('3 days ago ... HubSpot is expensive');
+            expect(dateStr).not.toBeNull();
+            const date = new Date(dateStr);
+            const diffDays = Math.round((new Date() - date) / (1000 * 60 * 60 * 24));
+            expect(diffDays).toBe(3);
+        });
+
+        it('should parse Month Day, Year format', () => {
+            const dateStr = parseSnippetDate('May 15, 2024 ... HubSpot vs Vercel');
+            expect(dateStr).not.toBeNull();
+            expect(dateStr.startsWith('2024-05-15')).toBe(true);
+        });
+
+        it('should parse Day Month Year format', () => {
+            const dateStr = parseSnippetDate('15 May 2024 ... HubSpot vs Vercel');
+            expect(dateStr).not.toBeNull();
+            expect(dateStr.startsWith('2024-05-15')).toBe(true);
+        });
+
+        it('should parse ISO Date format', () => {
+            const dateStr = parseSnippetDate('2024-05-15 ... HubSpot vs Vercel');
+            expect(dateStr).not.toBeNull();
+            expect(dateStr.startsWith('2024-05-15')).toBe(true);
+        });
+
+        it('should parse Month Year format', () => {
+            const dateStr = parseSnippetDate('May 2024 ... HubSpot vs Vercel');
+            expect(dateStr).not.toBeNull();
+            expect(dateStr.startsWith('2024-05-01')).toBe(true);
+        });
+    });
+
+    describe('estimateRedditPostDate', () => {
+        it('should estimate date correctly for known base36 IDs', () => {
+            const dateStr = estimateRedditPostDate('https://reddit.com/r/CRM/comments/1azdrxh/hubspot_alternatives/');
+            expect(dateStr).not.toBeNull();
+            // Should estimate close to Feb 25, 2024
+            expect(dateStr.startsWith('2024-02-25')).toBe(true);
+        });
+    });
+
+    describe('estimateLinkedInPostDate', () => {
+        it('should parse snowflake timestamp from activity ID', () => {
+            const dateStr = estimateLinkedInPostDate('https://linkedin.com/posts/activity-7138259296076619777');
+            expect(dateStr).not.toBeNull();
+            // Should resolve to Dec 6, 2023
+            expect(dateStr.startsWith('2023-12-06')).toBe(true);
+        });
+    });
+
+    describe('estimateG2ReviewDate', () => {
+        it('should estimate date correctly for review ID', () => {
+            const dateStr = estimateG2ReviewDate('https://www.g2.com/products/hubspot/reviews/hubspot-review-8200000');
+            expect(dateStr).not.toBeNull();
+            // Should resolve to Jan 1, 2024
+            expect(dateStr.startsWith('2024-01-01')).toBe(true);
+        });
+    });
+
+    describe('parseOrEstimatePostDate', () => {
+        it('should prioritize snippet dates over URL estimations', () => {
+            const res = parseOrEstimatePostDate('May 15, 2024 ... HubSpot alternatives', 'https://reddit.com/comments/1azdrxh', 'reddit');
+            expect(res.createdAt.startsWith('2024-05-15')).toBe(true);
+            expect(res.dateSource).toBe('actual');
+        });
+
+        it('should fall back to estimation if snippet lacks a date', () => {
+            const res = parseOrEstimatePostDate('HubSpot alternatives discussed', 'https://reddit.com/comments/1azdrxh', 'reddit');
+            expect(res.createdAt.startsWith('2024-02-25')).toBe(true);
+            expect(res.dateSource).toBe('actual');
         });
     });
 });

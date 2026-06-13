@@ -1,5 +1,6 @@
 import { log } from 'apify';
 import { searchWeb } from '../utils/searchEngine.js';
+import { parseOrEstimatePostDate } from '../utils/normalizer.js';
 import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
@@ -71,8 +72,7 @@ export async function scrapeG2(companies, maxResults = 10) {
                         url: urlPath || `https://www.g2.com/products/${encodeURIComponent(company.toLowerCase())}/reviews`,
                         author: 'G2 Reviewer',
                         sourceCategory: 'g2_reviews',
-                        createdAt: new Date().toISOString(),
-                        dateSource: 'inferred',
+                        ...parseOrEstimatePostDate(snippet, urlPath, 'g2'),
                         scrapedAt: new Date().toISOString()
                     });
                 }

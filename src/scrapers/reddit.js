@@ -1,5 +1,6 @@
 import { log } from 'apify';
 import { searchWeb } from '../utils/searchEngine.js';
+import { parseOrEstimatePostDate } from '../utils/normalizer.js';
 import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
@@ -84,8 +85,7 @@ export async function scrapeReddit(companies, maxResults = 10) {
                             url: urlPath,
                             author: 'Reddit User',
                             subreddit: subreddit,
-                            createdAt: new Date().toISOString(),
-                            dateSource: 'inferred',
+                            ...parseOrEstimatePostDate(snippet, urlPath, 'reddit'),
                             scrapedAt: new Date().toISOString()
                         });
                     }

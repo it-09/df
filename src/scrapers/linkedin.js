@@ -1,5 +1,6 @@
 import { log } from 'apify';
 import { searchWeb } from '../utils/searchEngine.js';
+import { parseOrEstimatePostDate } from '../utils/normalizer.js';
 
 // LINKEDIN COMMERCIAL GATING V4 — STRICT ALLOW/DENY SYSTEM
 const DENY_PATTERNS = [
@@ -137,8 +138,7 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                             author,
                             sourceCategory: 'linkedin_posts',
                             detectedRole: detectedRole,
-                            createdAt: new Date().toISOString(),
-                            dateSource: 'inferred',
+                            ...parseOrEstimatePostDate(snippet, urlPath, 'linkedin'),
                             scrapedAt: new Date().toISOString()
                         });
                     }
