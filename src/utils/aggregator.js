@@ -157,7 +157,7 @@ export function generateExecutiveSummary(allSignals, highIntentAlerts, mode = 'o
     const commercialSignals = allSignals.filter(s => s.commercialRelevanceLevel !== 'LOW' && s.signalQuality !== 'REJECT');
     
     // B. SWITCHING SIGNALS
-    const switchingSignals = commercialSignals.filter(s => s.crmReady?.switchingDetected);
+    const switchingSignals = commercialSignals.filter(s => s.switchSignals?.switchingDetected);
     const switchingText = switchingSignals.length > 0 
         ? `${switchingSignals.length} active competitor switching signals detected.`
         : 'No immediate switching signals detected.';
@@ -184,8 +184,8 @@ export function generateExecutiveSummary(allSignals, highIntentAlerts, mode = 'o
     // E. TOP PAIN THEMES
     const painThemes = {};
     commercialSignals.forEach(s => {
-        if (s.crmReady?.painTypes) {
-            s.crmReady.painTypes.forEach(p => {
+        if (s.painSignals?.painTypes) {
+            s.painSignals.painTypes.forEach(p => {
                 painThemes[p] = (painThemes[p] || 0) + 1;
             });
         }

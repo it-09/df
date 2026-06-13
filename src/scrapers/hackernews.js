@@ -1,22 +1,7 @@
 // Hacker News scraper module
-import axios from 'axios';
 import { log } from 'apify';
-
-/**
- * Retry wrapper for axios requests with exponential backoff
- */
-async function axiosWithRetry(config, retries = 3) {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            return await axios({ timeout: 15000, ...config });
-        } catch (err) {
-            if (attempt === retries) throw err;
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-            log.debug(`HN request failed (attempt ${attempt}/${retries}), retrying in ${delay}ms...`, { error: err.message });
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-}
+import { axiosWithRetry } from '../utils/http.js';
+import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
  * Strip HTML tags from text (HN Algolia returns raw HTML)
@@ -34,9 +19,8 @@ function stripHtml(text) {
  * @returns {Promise<Array>} - Array of signals
  */
 export async function scrapeHackerNews(companies, maxResults = 10) {
-    const hitsPerPage = Math.min(maxResults, 50); // Algolia max is 1000, but keep it reasonable
+    const hitsPerPage = Math.min(maxResults, 50);
 
-    // M1: Parallelize across companies
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const companyStart = Date.now();
@@ -46,23 +30,6 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             let diagRawResults = 0;
             let diagFilteredSignals = 0;
             let diagSpamRejected = 0;
-
-            const SEO_SPAM_PATTERNS = [
-                /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
-                /\bguide\b/i, /\breview\b/i, /\bcomparison\b/i, /\bcompetitors?\b/i,
-                /\bvs\b/i, /\bversus\b/i, /\bmarket\s+share\b/i, /\branking\b/i,
-                /\blist\s+of\b/i, /\bsoftware\s+like\b/i, /\balternative\s+tools\b/i
-            ];
-
-            const HUMAN_INTENT_PATTERNS = [
-                /\blooking\s+for\b/i, /\bneed\s+alternative\b/i, /\bswitching\s+from\b/i,
-                /\bmoving\s+away\b/i, /\bfed\s+up\b/i, /\btoo\s+expensive\b/i,
-                /\bpricing\s+issue\b/i, /\banyone\s+using\b/i, /\brecommend\b/i,
-                /\brecommendation\b/i, /\bthinking\s+about\b/i, /\breplace\b/i,
-                /\bmigrate\b/i, /\bmigration\b/i, /\bwhat\s+are\s+good\b/i,
-                /\bexperience\s+with\b/i, /\bworth\s+it\b/i, /\bproblem\s+with\b/i,
-                /\bdissatisfied\b/i, /\bfrustrated\b/i, /\bchurn\b/i
-            ];
 
             try {
                 // Search stories
@@ -76,26 +43,22 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                         const content = stripHtml(hit.story_text || hit.comment_text || '').substring(0, 2000);
                         const fullText = (title + " " + content).toLowerCase();
 
-                        // REJECT: technical architecture, open-source debates, benchmarking, engineering implementation noise
+                        // REJECT: technical noise
                         const hasNoise = /(architecture|open-source|benchmarking|implementation|stack trace|ci\/cd|deployment|bug|issue|refactor)/i.test(fullText);
                         if (hasNoise) {
                             diagFilteredSignals++;
                             continue;
                         }
 
-                        // COMMERCIAL INTENT GATE V2
-                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
-                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
-
-                        if (isSeoSpam && !hasHumanIntent) {
+                        // COMMERCIAL INTENT GATE
+                        if (isSeoSpam(fullText) && !hasHumanIntent(fullText)) {
                             diagSpamRejected++;
                             log.debug(`HN_SPAM_REJECTED: ${title}`);
                             continue;
                         }
 
-                        // ALLOW ONLY: commercial/evaluation threads
                         const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
-                        if (!hasHumanIntent && !hasCommercial) {
+                        if (!hasHumanIntent(fullText) && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;
                         }
@@ -110,6 +73,7 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             points: hit.points || 0,
                             numComments: hit.num_comments || 0,
                             createdAt: hit.created_at,
+                            dateSource: 'actual',
                             scrapedAt: new Date().toISOString()
                         });
                     }
@@ -136,18 +100,14 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             continue;
                         }
 
-                        // COMMERCIAL INTENT GATE V2
-                        const isSeoSpam = SEO_SPAM_PATTERNS.some(r => r.test(fullText));
-                        const hasHumanIntent = HUMAN_INTENT_PATTERNS.some(r => r.test(fullText));
-
-                        if (isSeoSpam && !hasHumanIntent) {
+                        if (isSeoSpam(fullText) && !hasHumanIntent(fullText)) {
                             diagSpamRejected++;
                             log.debug(`HN_SPAM_REJECTED: ${title}`);
                             continue;
                         }
 
                         const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
-                        if (!hasHumanIntent && !hasCommercial) {
+                        if (!hasHumanIntent(fullText) && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;
                         }
@@ -160,6 +120,7 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             url: `https://news.ycombinator.com/item?id=${hit.objectID}`,
                             author: hit.author || 'unknown',
                             createdAt: hit.created_at,
+                            dateSource: 'actual',
                             scrapedAt: new Date().toISOString()
                         });
                     }
@@ -183,7 +144,6 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
         })
     );
 
-    // Collect successful results
     const allSignals = [];
     for (const result of results) {
         if (result.status === 'fulfilled') {

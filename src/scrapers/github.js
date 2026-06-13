@@ -1,22 +1,6 @@
 // GitHub scraper module
-import axios from 'axios';
 import { log } from 'apify';
-
-/**
- * Retry wrapper for axios requests with exponential backoff
- */
-async function axiosWithRetry(config, retries = 3) {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            return await axios({ timeout: 15000, ...config });
-        } catch (err) {
-            if (attempt === retries) throw err;
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-            log.debug(`GitHub request failed (attempt ${attempt}/${retries}), retrying in ${delay}ms...`, { error: err.message });
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-}
+import { axiosWithRetry } from '../utils/http.js';
 
 /**
  * Scrape GitHub issues and discussions for company mentions
@@ -26,9 +10,8 @@ async function axiosWithRetry(config, retries = 3) {
  * @returns {Promise<Array>} - Array of signals
  */
 export async function scrapeGitHub(companies, maxResults = 10) {
-    const perPage = Math.min(maxResults, 30); // GitHub API max per_page is 30 for search
+    const perPage = Math.min(maxResults, 30);
 
-    // M1: Parallelize across companies
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const companyStart = Date.now();
@@ -69,7 +52,6 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                         const hasCommercialIntent = mustContainOneOf.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
                         const hasTechnicalNoise = rejectIfContains.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
                         
-                        // STRICT GATE: GitHub MUST contain strong commercial language AND must NOT contain hard-reject noise.
                         if (hasTechnicalNoise || !hasCommercialIntent) {
                             continue; 
                         }
@@ -83,6 +65,7 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                             author: item.user?.login || 'unknown',
                             repository: item.repository_url?.split('/').slice(-2).join('/') || '',
                             createdAt: item.created_at,
+                            dateSource: 'actual',
                             scrapedAt: new Date().toISOString()
                         });
                     }
@@ -101,7 +84,6 @@ export async function scrapeGitHub(companies, maxResults = 10) {
         })
     );
 
-    // Collect successful results
     const allSignals = [];
     for (const result of results) {
         if (result.status === 'fulfilled') {

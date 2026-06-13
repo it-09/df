@@ -198,9 +198,9 @@ export function generateCrmReady(data) {
         confidenceScore = Math.min(99, confidenceScore + 5);
     }
 
-    // Ensure it feels premium
+    // Ensure it feels premium (deterministic floor)
     if (confidenceScore < 40 && data.leadPriority !== 'LOW') {
-        confidenceScore = 40 + Math.floor(Math.random() * 20);
+        confidenceScore = 40 + ((data.intentScore || 0) % 20);
     }
 
     return {

@@ -24,8 +24,8 @@ const JOB_TITLE_PATTERNS = [
     { regex: /\b(director|head).*(operations)\b/gi, title: 'Director of Operations', seniority: 'director', department: 'operations' },
 
     // Manager level
-    { regex: /\b(engineering manager|em)\b/gi, title: 'Engineering Manager', seniority: 'manager', department: 'engineering' },
-    { regex: /\b(product manager|pm)\b/gi, title: 'Product Manager', seniority: 'manager', department: 'product' },
+    { regex: /\b(engineering manager)\b/gi, title: 'Engineering Manager', seniority: 'manager', department: 'engineering' },
+    { regex: /\b(product manager)\b/gi, title: 'Product Manager', seniority: 'manager', department: 'product' },
     { regex: /\b(sales manager)\b/gi, title: 'Sales Manager', seniority: 'manager', department: 'sales' },
     { regex: /\b(marketing manager)\b/gi, title: 'Marketing Manager', seniority: 'manager', department: 'marketing' },
 

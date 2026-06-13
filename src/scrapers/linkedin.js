@@ -1,33 +1,7 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { log } from 'apify';
+import { searchWeb } from '../utils/searchEngine.js';
 
-/**
- * Retry wrapper for axios requests with exponential backoff
- */
-async function axiosWithRetry(config, retries = 3) {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            return await axios({
-                timeout: 15000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                },
-                ...config
-            });
-        } catch (err) {
-            if (attempt === retries) throw err;
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-            log.debug(`LinkedIn request failed (attempt ${attempt}/${retries}), retrying in ${delay}ms...`, { error: err.message });
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-}
-
-// ========================================================
 // LINKEDIN COMMERCIAL GATING V4 — STRICT ALLOW/DENY SYSTEM
-// ========================================================
-
 const DENY_PATTERNS = [
     /\bhow\s+to\b/i, /\bguide\b/i, /\btips\b/i, /\bbest\s+practices\b/i,
     /\badoption\b/i, /\blaunch\b/i, /\bfunding\b/i, /\bhiring\b/i,
@@ -57,8 +31,7 @@ const ALLOW_PATTERNS = [
 ];
 
 /**
- * Scrape LinkedIn posts using Yahoo Search Dorking.
- * Yahoo Search is extremely permissive with bots and datacenter IPs compared to Google/DDG.
+ * Scrape LinkedIn posts using Yahoo/Bing Search Dorking.
  * Zero API keys required.
  * 
  * @param {string[]} companies - Companies to search for
@@ -86,7 +59,7 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                 `site:linkedin.com/posts best crm for`
             ];
 
-            log.info(`Scraping LinkedIn (via Yahoo Dorking) for: ${company}`);
+            log.info(`Scraping LinkedIn (via Search Dorking) for: ${company}`);
             
             let diagRawResults = 0;
             let diagNoiseRejected = 0;
@@ -96,34 +69,28 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
 
-                const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}&n=10`;
-                
                 try {
-                    const response = await axiosWithRetry({ method: 'GET', url });
-                    const $ = cheerio.load(response.data);
+                    const searchResults = await searchWeb(q, 10);
 
-                    $('.algo').each((i, el) => {
+                    for (const result of searchResults) {
                         diagRawResults++;
-                        if (signals.length >= maxResults) return;
+                        if (signals.length >= maxResults) break;
                         
-                        const title = $(el).find('h3').text().trim();
-                        let urlPath = $(el).find('a').first().attr('href') || '';
-                        const ruMatch = urlPath.match(/\/RU=([^/]+)/);
-                        if (ruMatch) urlPath = decodeURIComponent(ruMatch[1]);
-                        
-                        const snippet = $(el).find('.compText').text().trim() || $(el).find('.fz-ms').text().trim();
+                        const title = result.title;
+                        const urlPath = result.url;
+                        const snippet = result.snippet;
 
                         // Skip non-post pages
                         if (!urlPath.includes('/posts/') && !urlPath.includes('/feed/update/')) {
-                            return;
+                            continue;
                         }
                         if (!title && !snippet) {
-                            return;
+                            continue;
                         }
 
                         // Deduplication by URL
                         if (seenUrls.has(urlPath)) {
-                            return;
+                            continue;
                         }
                         seenUrls.add(urlPath);
 
@@ -143,25 +110,22 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
 
                         const fullText = (title + " " + snippet).toLowerCase();
 
-                        // ============================================
                         // STRICT LINKEDIN COMMERCIAL GATING V4
-                        // ============================================
                         const hasDenyPattern = DENY_PATTERNS.some(r => r.test(fullText));
                         const hasCommercialIntent = ALLOW_PATTERNS.some(r => r.test(fullText));
 
                         if (hasDenyPattern && !hasCommercialIntent) {
                             diagNoiseRejected++;
                             log.debug(`LINKEDIN_NOISE_REJECTED: ${title}`);
-                            return;
+                            continue;
                         }
 
                         if (hasCommercialIntent) {
                             diagCommercialPass++;
                         } else {
-                            // No deny pattern, but also no commercial intent — low confidence
                             diagLowConfidence++;
                             log.debug(`LINKEDIN_LOW_CONFIDENCE: ${title}`);
-                            return; // Skip ambiguous content
+                            continue;
                         }
 
                         signals.push({
@@ -171,14 +135,15 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                             content: snippet,
                             url: urlPath,
                             author,
-                            subreddit: 'linkedin_posts',
+                            sourceCategory: 'linkedin_posts',
                             detectedRole: detectedRole,
                             createdAt: new Date().toISOString(),
+                            dateSource: 'inferred',
                             scrapedAt: new Date().toISOString()
                         });
-                    });
+                    }
                     
-                    // Small delay to avoid hammering Yahoo
+                    // Small delay between queries
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } catch (err) {
                     log.debug(`LinkedIn dork query failed for ${company} -> ${q}`);

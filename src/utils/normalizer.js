@@ -1,4 +1,5 @@
 // Data normalization utilities
+import crypto from 'crypto';
 
 /**
  * Fuzzy match company names
@@ -87,20 +88,13 @@ export function cleanText(text) {
 }
 
 /**
- * Generate a simple hash for deduplication
+ * Generate a collision-resistant hash for deduplication
  * @param {string} text - Text to hash
- * @returns {string} - Hash string
+ * @returns {string} - SHA-256 hash string
  */
 export function simpleHash(text) {
     if (!text) return '';
-
-    let hash = 0;
-    for (let i = 0; i < text.length; i++) {
-        const char = text.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash.toString(36);
+    return crypto.createHash('sha256').update(text).digest('hex');
 }
 
 /**
