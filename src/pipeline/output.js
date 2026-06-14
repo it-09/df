@@ -78,7 +78,7 @@ export async function outputResults({
         signal.freshnessOverride = false;
         
         // Exception rules: explicit high-value commercial behavior
-        const exceptionRegex = /(moving away from|switching from|looking for alternatives|fed up with|replacing|better than|migration)/i;
+        const exceptionRegex = /(moving away from|switching from|looking for alternatives|fed up with|replacing|better than|migration|alternative|vs\b|versus\b|pricing|compare|comparison|problems|review)/i;
         if (exceptionRegex.test(signal.content || '') || exceptionRegex.test(signal.title || '')) {
             signal.freshnessOverride = true;
         }
