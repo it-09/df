@@ -79,11 +79,12 @@ export function enrichSignals(enrichedSignals, companyProfiles, seenHashes, moni
     // Apply diversity quotas with minimum guarantees
     const totalAvailable = Object.values(availableBySource).reduce((a, b) => a + b, 0);
     const sourceQuotas = {
-        'reddit': Math.max(3, Math.min(Math.ceil(totalAvailable * 0.40), availableBySource['reddit'] || 0)),
-        'linkedin': Math.max(2, Math.min(Math.ceil(totalAvailable * 0.30), availableBySource['linkedin'] || 0)),
-        'g2': Math.max(2, Math.min(Math.ceil(totalAvailable * 0.20), availableBySource['g2'] || 0)),
-        'hackernews': Math.min(2, availableBySource['hackernews'] || 0),
-        'github': Math.min(1, availableBySource['github'] || 0)
+        'reddit':      Math.max(3, Math.min(Math.ceil(totalAvailable * 0.35), availableBySource['reddit']      || 0)),
+        'linkedin':    Math.max(2, Math.min(Math.ceil(totalAvailable * 0.25), availableBySource['linkedin']    || 0)),
+        'g2':          Math.max(2, Math.min(Math.ceil(totalAvailable * 0.20), availableBySource['g2']          || 0)),
+        'hackernews':  Math.max(2, Math.min(Math.ceil(totalAvailable * 0.15), availableBySource['hackernews']  || 0)),
+        'github':      Math.max(2, Math.min(Math.ceil(totalAvailable * 0.15), availableBySource['github']      || 0)),
+        'news':        Math.max(1, Math.min(Math.ceil(totalAvailable * 0.10), availableBySource['news']        || 0)),
     };
     if (process.env.DEBUG_MODE === 'true') log.info('SOURCE_QUOTAS:', sourceQuotas);
 

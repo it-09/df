@@ -1,7 +1,7 @@
 // Hacker News scraper module
 import { log } from 'apify';
 import { axiosWithRetry } from '../utils/http.js';
-import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
+import { isSeoSpamLight, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
  * Strip HTML tags from text (HN Algolia returns raw HTML)
@@ -43,21 +43,21 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                         const content = stripHtml(hit.story_text || hit.comment_text || '').substring(0, 2000);
                         const fullText = (title + " " + content).toLowerCase();
 
-                        // REJECT: technical noise
-                        const hasNoise = /(architecture|open-source|benchmarking|implementation|stack trace|ci\/cd|deployment|bug|issue|refactor)/i.test(fullText);
+                        // REJECT: clear technical noise (not product evaluation)
+                        const hasNoise = /(stack trace|ci\/cd|deployment pipeline|bug report|refactor sprint|internal infrastructure)/i.test(fullText);
                         if (hasNoise) {
                             diagFilteredSignals++;
                             continue;
                         }
 
-                        // COMMERCIAL INTENT GATE
-                        if (isSeoSpam(fullText) && !hasHumanIntent(fullText)) {
+                        // LIGHT spam gate for HN (avoids killing comparison/review content)
+                        if (isSeoSpamLight(fullText) && !hasHumanIntent(fullText)) {
                             diagSpamRejected++;
                             log.debug(`HN_SPAM_REJECTED: ${title}`);
                             continue;
                         }
 
-                        const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
+                        const hasCommercial = /(recommend|alternatives?|comparison|migration|tooling decision|vendor evaluation|pricing|vs\b|switching|replacing|too expensive|fed up|moving away|looking for|open.source alternative)/i.test(fullText);
                         if (!hasHumanIntent(fullText) && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;
@@ -94,19 +94,20 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                         const content = stripHtml(hit.comment_text || '').substring(0, 2000);
                         const fullText = (title + " " + content).toLowerCase();
 
-                        const hasNoise = /(architecture|open-source|benchmarking|implementation|stack trace|ci\/cd|deployment|bug|issue|refactor)/i.test(fullText);
+                        // REJECT: clear technical noise
+                        const hasNoise = /(stack trace|ci\/cd|deployment pipeline|bug report|refactor sprint|internal infrastructure)/i.test(fullText);
                         if (hasNoise) {
                             diagFilteredSignals++;
                             continue;
                         }
 
-                        if (isSeoSpam(fullText) && !hasHumanIntent(fullText)) {
+                        if (isSeoSpamLight(fullText) && !hasHumanIntent(fullText)) {
                             diagSpamRejected++;
                             log.debug(`HN_SPAM_REJECTED: ${title}`);
                             continue;
                         }
 
-                        const hasCommercial = /(recommendation|alternatives|comparison|migration|tooling decision|vendor evaluation|pricing|vs)/i.test(fullText);
+                        const hasCommercial = /(recommend|alternatives?|comparison|migration|tooling decision|vendor evaluation|pricing|vs\b|switching|replacing|too expensive|fed up|moving away|looking for|open.source alternative)/i.test(fullText);
                         if (!hasHumanIntent(fullText) && !hasCommercial) {
                             diagFilteredSignals++;
                             continue;

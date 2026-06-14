@@ -38,19 +38,21 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                         const body = (item.body || '').substring(0, 2000);
                         const fullText = (title + " " + body).toLowerCase();
                         
-                        // AGGRESSIVE TECHNICAL NOISE FILTERING
+                        // COMMERCIAL INTENT GATE - require at least one buying signal
                         const mustContainOneOf = [
                             "alternative", "switching", "replace", "moving away", "too expensive",
-                            "competitor", "vs", "pricing", "recommendation", "looking for"
+                            "competitor", " vs ", "versus", "pricing", "recommendation", "looking for",
+                            "comparison", "evaluation", "considering", "better than", "migrate",
+                            "canceling", "cancelling", "frustrated", "dissatisfied", "wish it had",
+                            "limitation", "problem with", "issue with"
                         ];
                         const rejectIfContains = [
-                            "rebranding", "migration plan", "epic", "rename", "schema", "ci/cd",
-                            "bug", "refactor", "infrastructure", "internal tooling", "bronze",
-                            "pipeline", "deployment", "api failure"
+                            "rebranding", "epic:", "rename:", "schema migration", "ci/cd pipeline",
+                            "internal tooling", "deployment rollout", "api rate limit"
                         ];
 
-                        const hasCommercialIntent = mustContainOneOf.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
-                        const hasTechnicalNoise = rejectIfContains.some(phrase => new RegExp(`\\b${phrase}\\b`, 'i').test(fullText));
+                        const hasCommercialIntent = mustContainOneOf.some(phrase => fullText.includes(phrase));
+                        const hasTechnicalNoise = rejectIfContains.some(phrase => fullText.includes(phrase));
                         
                         if (hasTechnicalNoise || !hasCommercialIntent) {
                             continue; 

@@ -1,7 +1,7 @@
 import { log } from 'apify';
 import { searchWeb } from '../utils/searchEngine.js';
 import { parseOrEstimatePostDate } from '../utils/normalizer.js';
-import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
+import { isSeoSpamLight, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
  * Scrape G2 reviews using Yahoo/Bing Search Dorking.
@@ -18,7 +18,7 @@ export async function scrapeG2(companies, maxResults = 10) {
             log.info(`G2_START [${company}]`);
             const signals = [];
 
-            const searchQuery = `site:g2.com/products/ "${company}" review (dislike OR alternative OR expensive OR slow OR pricing OR comparison OR missing feature OR frustrated)`;
+            const searchQuery = `site:g2.com "${company}" (dislike OR alternative OR expensive OR pricing OR "missing feature" OR frustrated OR "wish it had" OR limitations OR switching OR canceling)`;
             
             log.info(`Scraping G2 Reviews (via Search Dorking) for: ${company}`);
 
@@ -38,17 +38,14 @@ export async function scrapeG2(companies, maxResults = 10) {
                     const snippet = result.snippet;
                     const fullText = (title + " " + snippet).toLowerCase();
 
-                    if (!title.toLowerCase().includes('review') && !snippet.toLowerCase().includes('review')) {
-                        diagFilteredSignals++;
-                        continue;
-                    }
-                    if (urlPath.includes('/compare/') || urlPath.includes('/category/')) {
+                    // Skip category/compare pages (not individual reviews)
+                    if (urlPath.includes('/category/')) {
                         diagFilteredSignals++;
                         continue;
                     }
 
-                    // COMMERCIAL INTENT GATE
-                    const isSpam = isSeoSpam(fullText);
+                    // LIGHT spam gate — only catch obvious listicles
+                    const isSpam = isSeoSpamLight(fullText);
                     const hasIntent = hasHumanIntent(fullText);
 
                     if (isSpam && !hasIntent) {
@@ -57,8 +54,8 @@ export async function scrapeG2(companies, maxResults = 10) {
                         continue;
                     }
 
-                    // Ensure dissatisfaction or comparison markers exist
-                    const hasDissatisfaction = /(pricing|expensive|too expensive|alternatives|comparison|vs|limitations|wish it had|missing feature|moving away|frustrated|support issues)/i.test(fullText);
+                    // Primary gate: any dissatisfaction, evaluation or comparison signal
+                    const hasDissatisfaction = /(pricing|expensive|too expensive|alternative|comparison|vs\b|versus|limitations|wish it had|missing feature|moving away|frustrated|support issues|dislike|canceling|cancelling|switching|slow|buggy|confusing|overpriced)/i.test(fullText);
                     if (!hasIntent && !hasDissatisfaction) {
                         diagFilteredSignals++;
                         continue;
