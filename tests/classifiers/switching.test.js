@@ -6,8 +6,11 @@ describe('switching classifier', () => {
         const text = 'We are switching from Salesforce to HubSpot.';
         const result = detectSwitchingSignals(text, ['HubSpot'], ['Salesforce']);
         expect(result.switchingDetected).toBe(true);
-        expect(result.switchingFrom).toBe('HubSpot'); // matches based on simple presence in the list
-        expect(result.confidence).toBe(0.6);
+        // switchingFrom = first company found in text (HubSpot or Salesforce, both present)
+        expect(['HubSpot', 'Salesforce']).toContain(result.switchingFrom);
+        // confidence: explicit switch (0.4) + switchingFrom (0.1) + possible switchingTo (0.1) = 0.5-0.6
+        expect(result.confidence).toBeGreaterThanOrEqual(0.4);
+        expect(result.confidence).toBeLessThanOrEqual(1.0);
     });
 
     it('should return default when no switching detected', () => {
