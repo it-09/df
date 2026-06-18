@@ -1,22 +1,6 @@
 // Shared HTTP utilities
-import axios from 'axios';
+import { gotScraping } from 'got-scraping';
 import { log } from 'apify';
-
-// Rotating user agents to reduce bot detection when parallel scrapers hit the same host
-const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-];
-
-let uaIndex = 0;
-function nextUserAgent() {
-    const ua = USER_AGENTS[uaIndex % USER_AGENTS.length];
-    uaIndex++;
-    return ua;
-}
 
 /**
  * Sleep for a given number of milliseconds
@@ -26,25 +10,60 @@ export function sleep(ms) {
 }
 
 /**
- * Retry wrapper for axios requests with exponential backoff
- * @param {Object} config - Axios request config
+ * Retry wrapper that mimics axios but uses got-scraping under the hood.
+ * got-scraping automatically uses Apify Proxy (via process.env.APIFY_PROXY_PASSWORD),
+ * generates perfect browser headers (TLS fingerprinting), and rotates them.
+ * 
+ * @param {Object} config - Axios-like request config
  * @param {number} retries - Number of retries (default: 3)
- * @returns {Promise} - Axios response
+ * @returns {Promise} - Axios-like response object ({ data, status, headers })
  */
 export async function axiosWithRetry(config, retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            return await axios({
-                timeout: 20000,
-                ...config,
-                // Allow per-request header overrides
-                headers: { ...{ 'User-Agent': nextUserAgent(), 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' }, ...(config.headers || {}) }
-            });
+            const options = {
+                url: config.url,
+                method: config.method || 'GET',
+                timeout: { request: 20000 },
+                responseType: 'text',
+                retry: { limit: 0 } // We handle our own retry logic
+            };
+
+            // Merge custom headers if any (gotScraping handles User-Agent automatically)
+            if (config.headers) {
+                options.headers = config.headers;
+            }
+
+            // Support form data (used by DuckDuckGo POST)
+            if (config.data) {
+                options.body = config.data;
+            }
+
+            const response = await gotScraping(options);
+
+            // Mimic axios response
+            let data = response.body;
+            if (response.headers['content-type'] && response.headers['content-type'].includes('application/json')) {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    // ignore JSON parse error, keep as string
+                }
+            }
+
+            return {
+                data,
+                status: response.statusCode,
+                headers: response.headers
+            };
+
         } catch (err) {
+            const status = err.response ? err.response.statusCode : null;
+
             // Fast-fail: If the server explicitly rate-limits or blocks us, do not retry.
             // Retrying a 429/403 just wastes Apify compute time and runs up the $0.10 cost limit.
-            if (err.response && [401, 403, 429].includes(err.response.status)) {
-                log.debug(`Fast-fail triggered (HTTP ${err.response.status}). Rate limited or blocked.`);
+            if (status && [401, 403, 429, 503].includes(status)) {
+                log.debug(`Fast-fail triggered (HTTP ${status}). Rate limited or blocked.`);
                 throw err;
             }
 
