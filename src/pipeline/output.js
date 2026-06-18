@@ -107,11 +107,11 @@ export async function outputResults({
         }
 
         // HIGH-INTENT FILTER: Only surface signals with genuine buyer intent.
-        // LOW/MEDIUM signals are still processed for aggregation above but
-        // must NOT pollute the buying-signals dataset output.
+        // Require leadPriority HIGH or URGENT — this already factors in intentScore,
+        // so we don't need a separate score fallback (which was letting LOW-priority
+        // signals slip through when intentScore was inflated).
         const isHighIntent = signal.leadPriority === 'URGENT' ||
-            signal.leadPriority === 'HIGH' ||
-            (typeof signal.intentScore === 'number' && signal.intentScore >= 60);
+            signal.leadPriority === 'HIGH';
         if (!isHighIntent) {
             continue;
         }

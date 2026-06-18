@@ -42,17 +42,33 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                         const body = (item.body || '').substring(0, 2000);
                         const fullText = (title + " " + body).toLowerCase();
                         
-                        // COMMERCIAL INTENT GATE - require at least one buying signal
+                        // COMMERCIAL INTENT GATE — GitHub-specific.
+                        // GitHub issues MUST show genuine buyer/evaluation context, not
+                        // developer bug reports that happen to mention the company.
                         const mustContainOneOf = [
-                            "alternative", "switching", "replace", "moving away", "too expensive",
-                            "competitor", " vs ", "versus", "pricing", "recommendation", "looking for",
-                            "comparison", "evaluation", "considering", "better than", "migrate",
-                            "canceling", "cancelling", "frustrated", "dissatisfied", "wish it had",
-                            "limitation", "problem with", "issue with"
+                            "alternative to", "switching from", "replacing", "moving away",
+                            "too expensive", "competitor", " vs ", "versus", "pricing",
+                            "recommendation", "comparison", "considering switching",
+                            "better than", "canceling", "cancelling", "frustrated with",
+                            "dissatisfied", "wish it had", "looking for alternative"
                         ];
+                        // AGGRESSIVE NOISE REJECTION — catch dev/technical issues that
+                        // mention company name but have zero buyer intent.
                         const rejectIfContains = [
-                            "rebranding", "epic:", "rename:", "schema migration", "ci/cd pipeline",
-                            "internal tooling", "deployment rollout", "api rate limit"
+                            "rebranding", "epic:", "rename:", "schema migration", "ci/cd",
+                            "internal tooling", "deployment rollout", "api rate limit",
+                            "bug report", "stack trace", "error:", "exception:",
+                            "fix:", "feat:", "chore:", "refactor:", "test:", "docs:",
+                            "pull request", "merge", "pr #", "release notes",
+                            "npm install", "pip install", "yarn add", "pnpm add",
+                            "sdk", "wrapper", "binding", "connector", "plugin",
+                            "oauth", "auth token", "api key", "webhook", "endpoint",
+                            "not implemented", "undefined method", "typeerror",
+                            "mcp server", "model context protocol",
+                            "changelog", "breaking change", "deprecat",
+                            "unit test", "integration test", "ci pipeline",
+                            "dockerfile", "kubernetes", "helm chart",
+                            "implement", "add support for", "feature request"
                         ];
 
                         const hasCommercialIntent = mustContainOneOf.some(phrase => fullText.includes(phrase));

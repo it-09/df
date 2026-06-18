@@ -52,7 +52,15 @@ export async function scrapeG2(companies, maxResults = 10) {
                         const fullText = (title + " " + snippet).toLowerCase();
 
                         // Skip category/compare pages (not individual reviews)
-                        if (urlPath.includes('/category/')) {
+                        // Skip category/compare/list pages (not individual product reviews)
+                        if (urlPath.includes('/category/') || urlPath.includes('/categories/') ||
+                            urlPath.includes('/compare/') || urlPath.includes('/best-software/')) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+                        // Must be about the actual company — reject generic G2 list pages
+                        if (!urlPath.toLowerCase().includes(company.toLowerCase().replace(/\s+/g, '-')) &&
+                            !fullText.includes(company.toLowerCase())) {
                             diagFilteredSignals++;
                             continue;
                         }
