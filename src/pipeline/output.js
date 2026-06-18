@@ -184,13 +184,6 @@ export async function outputResults({
             }
         }
 
-        // Charge per signal (PPE)
-        try {
-            await Actor.charge({ eventName: 'result-signal', count: 1 });
-        } catch (error) {
-            await Actor.setStatusMessage(`Billing limit reached (free plan?). Processed ${chargedSignals - 1} paid signals.`, { isStatusMessageTerminal: false });
-            break;
-        }
     }
     
     // Schema Enforcement & Assertion
@@ -225,6 +218,13 @@ export async function outputResults({
         log.info(`Serialized payload size: ${payloadSizeKB} KB`);
         await pushDataToApify(finalRows, 'signals');
         log.info('Dataset persistence complete (Buying Signals — HIGH/URGENT intent only, sorted most-recent-first).');
+
+        // Charge per signal (PPE) after pushing data so the user retains what they pay for
+        try {
+            await Actor.charge({ eventName: 'result-signal', count: finalRows.length });
+        } catch (error) {
+            log.warning(`Billing limit reached during bulk charge. Successfully processed ${finalRows.length} signals.`);
+        }
     } else {
         log.warning('No high-intent signals met the threshold (leadPriority HIGH/URGENT or intentScore >= 60). Dataset push skipped.');
     }
