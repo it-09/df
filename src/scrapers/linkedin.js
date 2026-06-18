@@ -11,7 +11,7 @@ const DENY_PATTERNS = [
     /\bAI\s+trend/i, /\bannouncement\b/i, /\bjob\s+opening\b/i,
     /\bwe\s+are\s+hiring\b/i, /\bcompany\s+announcement\b/i, /\bproduct\s+launch\b/i,
     /\bemployee\s+celebration\b/i, /\bfundraising\b/i, /\beducational\b/i,
-    /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i, /\b2025\b/i, /\b2026\b/i,
+    /\btop\s+\d+\b/i, /\bbest\s+.*alternative/i,
     /\branking\b/i, /\blist\s+of\b/i, /\bsoftware\s+like\b/i,
     /\balternative\s+tools\b/i, /\bmarket\s+share\b/i
 ];
@@ -40,6 +40,11 @@ const ALLOW_PATTERNS = [
  * @returns {Promise<Array>} - Array of LinkedIn signals
  */
 export async function scrapeLinkedIn(companies, maxResults = 10) {
+    // Rolling 90-day window — force search engines to return recent posts only
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    const afterFilter = `after:${cutoffDate.toISOString().split('T')[0]}`;
+
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const companyStart = Date.now();
@@ -47,20 +52,22 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
             const signals = [];
             const seenUrls = new Set();
             
+            // Buyer-voice queries: specific to active evaluation behaviour, not thought-leadership.
+            // All queries include afterFilter to force recency.
             const queries = [
-                `site:linkedin.com/posts "${company}" alternative`,
-                `site:linkedin.com/feed/update "${company}" alternative`,
-                `site:linkedin.com/posts "${company}" pricing`,
-                `site:linkedin.com/feed/update "${company}" pricing`,
-                `site:linkedin.com/posts "switching from ${company}"`,
-                `site:linkedin.com/feed/update "moving away from ${company}"`,
-                `site:linkedin.com/posts crm recommendation`,
-                `site:linkedin.com/feed/update crm alternatives`,
-                `site:linkedin.com/posts looking for crm`,
-                `site:linkedin.com/posts best crm for`
+                `site:linkedin.com/posts "switching from ${company}" ${afterFilter}`,
+                `site:linkedin.com/posts "moving away from ${company}" ${afterFilter}`,
+                `site:linkedin.com/posts "${company}" "too expensive" OR "pricing" ${afterFilter}`,
+                `site:linkedin.com/posts "${company}" "looking for alternative" ${afterFilter}`,
+                `site:linkedin.com/posts "${company}" "frustrated" OR "fed up" ${afterFilter}`,
+                `site:linkedin.com/posts "${company}" alternative ${afterFilter}`,
+                `site:linkedin.com/feed/update "switching from ${company}" ${afterFilter}`,
+                `site:linkedin.com/feed/update "${company}" pricing alternative ${afterFilter}`,
+                `site:linkedin.com/posts crm recommendation ${afterFilter}`,
+                `site:linkedin.com/posts "looking for crm" OR "need crm" ${afterFilter}`
             ];
 
-            log.info(`Scraping LinkedIn (via Search Dorking) for: ${company}`);
+            log.info(`Scraping LinkedIn (via Search Dorking) for: ${company} (last 90 days)`);
             
             let diagRawResults = 0;
             let diagNoiseRejected = 0;

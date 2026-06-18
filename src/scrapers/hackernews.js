@@ -32,8 +32,10 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             let diagSpamRejected = 0;
 
             try {
+                // Rolling 90-day cutoff — Algolia supports numericFilters on created_at_i (Unix timestamp)
+                const cutoff90d = Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60);
                 // Search stories
-                const storiesUrl = `https://hn.algolia.com/api/v1/search?query=${query}&tags=story&hitsPerPage=${hitsPerPage}`;
+                const storiesUrl = `https://hn.algolia.com/api/v1/search?query=${query}&tags=story&hitsPerPage=${hitsPerPage}&numericFilters=created_at_i>${cutoff90d}`;
                 const response = await axiosWithRetry({ method: 'GET', url: storiesUrl });
 
                 if (response.data && response.data.hits) {
@@ -83,8 +85,8 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
             }
 
             try {
-                // Also search comments
-                const commentsUrl = `https://hn.algolia.com/api/v1/search?query=${query}&tags=comment&hitsPerPage=${hitsPerPage}`;
+                // Also search comments (same 90-day cutoff)
+                const commentsUrl = `https://hn.algolia.com/api/v1/search?query=${query}&tags=comment&hitsPerPage=${hitsPerPage}&numericFilters=created_at_i>${Math.floor(Date.now() / 1000) - (90 * 24 * 60 * 60)}`;
                 const commentsResponse = await axiosWithRetry({ method: 'GET', url: commentsUrl });
 
                 if (commentsResponse.data && commentsResponse.data.hits) {

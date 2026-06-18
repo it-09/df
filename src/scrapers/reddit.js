@@ -12,26 +12,41 @@ import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
  * @returns {Promise<Array>} - Array of Reddit signals
  */
 export async function scrapeReddit(companies, maxResults = 10) {
+    // Rolling 90-day window — force search engines to return recent posts only
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    const afterFilter = `after:${cutoffDate.toISOString().split('T')[0]}`;
+
     const results = await Promise.allSettled(
         companies.map(async (company) => {
             const companyStart = Date.now();
             log.info(`REDDIT_START [${company}]`);
             const signals = [];
             const seenUrls = new Set();
-            
+
+            // Buyer-voice queries: each targets a specific active evaluation behaviour.
+            // Generic "alternatives" / "vs" are dropped — they pull old evergreen listicles.
             const queries = [
-                `alternatives`, `vs`, `pricing`, `problems`, 
-                `migration`, `replacing`, `"fed up"`, `recommendation`
+                `"switching from ${company}"`,
+                `"looking for alternative" "${company}"`,
+                `"${company}" "too expensive" OR "pricing"`,
+                `"${company}" "fed up" OR "frustrated"`,
+                `"${company}" "anyone recommend" OR "recommendation"`,
+                `"replacing ${company}" OR "moved away from ${company}"`,
+                `"${company}" alternative ${afterFilter}`,
+                `"${company}" comparison evaluation ${afterFilter}`
             ];
 
             let diagSpamRejected = 0;
 
-            log.info(`Scraping Reddit (via Search Dorking) for: ${company}`);
+            log.info(`Scraping Reddit (via Search Dorking) for: ${company} (last 90 days)`);
 
             for (const q of queries) {
                 if (signals.length >= maxResults) break;
 
-                const searchQuery = `site:reddit.com "${company}" ${q}`;
+                // Append after-filter if not already baked into the query
+                const hasAfterFilter = q.includes('after:');
+                const searchQuery = `site:reddit.com ${q}${hasAfterFilter ? '' : ' ' + afterFilter}`;
                 
                 try {
                     const searchResults = await searchWeb(searchQuery, 10);

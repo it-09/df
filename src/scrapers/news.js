@@ -23,12 +23,22 @@ export async function scrapeNews(companies, apiKey, maxResults = 10) {
             const signals = [];
             try {
                 const query = encodeURIComponent(company);
-                const url = `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&pageSize=${pageSize}&apiKey=${apiKey}`;
+                // Rolling 30-day window: NewsAPI supports from= ISO date parameter
+                const fromDate = new Date();
+                fromDate.setDate(fromDate.getDate() - 30);
+                const fromStr = fromDate.toISOString().split('T')[0];
+                const url = `https://newsapi.org/v2/everything?q=${query}&sortBy=publishedAt&from=${fromStr}&pageSize=${pageSize}&apiKey=${apiKey}`;
 
                 const response = await axiosWithRetry({ method: 'GET', url });
 
                 if (response.data && response.data.articles) {
                     for (const article of response.data.articles) {
+                        // Commercial intent gate: filter out pure PR / announcements
+                        const articleText = ((article.title || '') + ' ' + (article.description || '')).toLowerCase();
+                        const hasCommercial = /(pricing|alternative|switch|competitor|dissatisfied|cancel|churn|replace|frustrated|evaluation|comparison|costly|expensive)/i.test(articleText);
+                        const isNoise = /(funding round|raises \$|series [a-e]|partnership announced|new feature|product launch|ipo|acqui)/i.test(articleText);
+                        if (!hasCommercial || isNoise) continue;
+
                         signals.push({
                             company,
                             source: 'news',

@@ -19,7 +19,11 @@ export async function scrapeGitHub(companies, maxResults = 10) {
             const signals = [];
             let rawCount = 0;
             try {
-                const query = encodeURIComponent(`${company} in:title,body type:issue`);
+                // Rolling 90-day cutoff: GitHub Search API supports created:>YYYY-MM-DD filter
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - 90);
+                const createdAfter = cutoffDate.toISOString().split('T')[0];
+                const query = encodeURIComponent(`${company} in:title,body type:issue created:>${createdAfter}`);
                 const url = `https://api.github.com/search/issues?q=${query}&sort=created&order=desc&per_page=${perPage}`;
 
                 const response = await axiosWithRetry({
