@@ -75,12 +75,15 @@ export async function outputResults({
         if (isNaN(ageDays) || ageDays < 0) ageDays = 0; // fallback for missing dates
         
         signal.contentAgeDays = ageDays;
-        signal.freshnessOverride = false;
-        
-        // Exception rules: explicit high-value commercial behavior
-        const exceptionRegex = /(moving away from|switching from|looking for alternatives|fed up with|replacing|better than|migration|alternative|vs\b|versus\b|pricing|compare|comparison|problems|review)/i;
-        if (exceptionRegex.test(signal.content || '') || exceptionRegex.test(signal.title || '')) {
-            signal.freshnessOverride = true;
+
+        // HARD 90-DAY CUTOFF — No exceptions.
+        // Old signals are NOT actionable buying intelligence. A Reddit post from 2022
+        // saying "switching from Salesforce" is useless in 2026 — that decision is long
+        // made. The after: search operators don't work on Yahoo/Bing, so this is the
+        // real enforcement layer.
+        if (ageDays > 90) {
+            signal.signalQuality = 'REJECT';
+            signal.rejectionReason = `Content too old (${ageDays} days). Buying signals must be ≤90 days.`;
         }
 
         if (ageDays <= 7 && signal.dateSource === 'actual') {
@@ -94,25 +97,8 @@ export async function outputResults({
             signal.freshnessCategory = 'RECENT';
         } else if (ageDays <= 90) {
             signal.freshnessCategory = 'STALE';
-            if (!signal.freshnessOverride) {
-                signal.intentScore = Math.max(0, signal.intentScore - 15);
-                if (signal.signalQuality === 'HIGH') signal.signalQuality = 'MEDIUM';
-            }
-        } else if (ageDays <= 180) {
-            signal.freshnessCategory = 'OLD';
-            if (!signal.freshnessOverride) {
-                signal.intentScore = Math.max(0, signal.intentScore - 30);
-                signal.signalQuality = 'LOW';
-            }
-        } else {
-            // Older than 180 days
-            signal.freshnessCategory = 'ANCIENT';
-            if (!signal.freshnessOverride) {
-                signal.signalQuality = 'REJECT';
-                signal.rejectionReason = `Content too old (${ageDays} days) without explicit commercial exception`;
-            } else {
-                signal.freshnessCategory = 'OLD (EXCEPTED)';
-            }
+            signal.intentScore = Math.max(0, signal.intentScore - 15);
+            if (signal.signalQuality === 'HIGH') signal.signalQuality = 'MEDIUM';
         }
 
         // STRICT FILTERING: Drop noisy / rejected signals completely
