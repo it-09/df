@@ -82,6 +82,16 @@ export async function scrapeG2(companies, maxResults = 10) {
                             continue;
                         }
 
+                        const estimatedDateObj = parseOrEstimatePostDate(snippet, urlPath, 'g2');
+                        const ageMs = Date.now() - new Date(estimatedDateObj.createdAt || new Date()).getTime();
+                        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+
+                        // Pre-filter: Don't count old posts toward maxResults limit
+                        if (ageDays > 90) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
                         signals.push({
                             company,
                             source: 'g2',
@@ -90,7 +100,7 @@ export async function scrapeG2(companies, maxResults = 10) {
                             url: urlPath || `https://www.g2.com/products/${encodeURIComponent(company.toLowerCase())}/reviews`,
                             author: 'G2 Reviewer',
                             sourceCategory: 'g2_reviews',
-                            ...parseOrEstimatePostDate(snippet, urlPath, 'g2'),
+                            ...estimatedDateObj,
                             scrapedAt: new Date().toISOString()
                         });
                     }

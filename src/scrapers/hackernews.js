@@ -19,7 +19,8 @@ function stripHtml(text) {
  * @returns {Promise<Array>} - Array of signals
  */
 export async function scrapeHackerNews(companies, maxResults = 10) {
-    const hitsPerPage = Math.min(maxResults, 50);
+    // Fetch more raw items to account for aggressive noise filtering
+    const hitsPerPage = Math.min(Math.max(maxResults * 3, 50), 100);
 
     const results = await Promise.allSettled(
         companies.map(async (company) => {
@@ -40,6 +41,7 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
 
                 if (response.data && response.data.hits) {
                     for (const hit of response.data.hits) {
+                        if (signals.length >= maxResults) break;
                         diagRawResults++;
                         const title = hit.title || '';
                         const content = stripHtml(hit.story_text || hit.comment_text || '').substring(0, 2000);
@@ -91,6 +93,7 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
 
                 if (commentsResponse.data && commentsResponse.data.hits) {
                     for (const hit of commentsResponse.data.hits) {
+                        if (signals.length >= maxResults) break;
                         diagRawResults++;
                         const title = `Comment on: ${hit.story_title || 'HN Thread'}`;
                         const content = stripHtml(hit.comment_text || '').substring(0, 2000);

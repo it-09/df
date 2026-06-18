@@ -4,6 +4,31 @@ import { log } from 'apify';
 import { axiosWithRetry, sleep } from './http.js';
 
 /**
+ * Global circuit breaker to track search engine rate-limiting.
+ * If an engine fails consecutively, we stop using it to prevent retry storms
+ * that waste Apify compute time and trigger the $0.10 cost limit.
+ */
+const engineHealth = {
+    yahoo: { consecutiveFailures: 0, isDead: false },
+    bing: { consecutiveFailures: 0, isDead: false },
+    ddg: { consecutiveFailures: 0, isDead: false }
+};
+
+const FAILURE_THRESHOLD = 3;
+
+function recordFailure(engine) {
+    engineHealth[engine].consecutiveFailures++;
+    if (engineHealth[engine].consecutiveFailures >= FAILURE_THRESHOLD) {
+        engineHealth[engine].isDead = true;
+        log.warning(`CIRCUIT BREAKER OPEN: ${engine.toUpperCase()} is DEAD (rate limited). Skipping for rest of run.`);
+    }
+}
+
+function recordSuccess(engine) {
+    engineHealth[engine].consecutiveFailures = 0;
+}
+
+/**
  * Random jitter delay between search requests to avoid rate limiting
  * when multiple scrapers fire in parallel.
  */
@@ -21,48 +46,67 @@ async function jitter(minMs = 800, maxMs = 2500) {
  * @returns {Promise<Array<{title: string, url: string, snippet: string}>>}
  */
 export async function searchWeb(query, maxResults = 10) {
+    // Check if ALL engines are dead
+    if (engineHealth.yahoo.isDead && engineHealth.bing.isDead && engineHealth.ddg.isDead) {
+        log.warning(`ALL ENGINES DEAD: Circuit breaker open for all search engines. Cannot fetch query: ${query}`);
+        return [];
+    }
+
     // Small random delay to stagger parallel scraper requests
     await jitter(500, 1500);
 
     // Try Yahoo first
-    try {
-        const results = await searchYahoo(query, maxResults);
-        if (results.length > 0) {
-            return results;
+    if (!engineHealth.yahoo.isDead) {
+        try {
+            const results = await searchYahoo(query, maxResults);
+            if (results.length > 0) {
+                recordSuccess('yahoo');
+                return results;
+            }
+            log.debug(`Yahoo returned 0 results for query, trying Bing fallback...`);
+            recordFailure('yahoo'); // 0 results is often a silent rate-limit / CAPTCHA page
+        } catch (err) {
+            log.debug(`Yahoo search failed, trying Bing fallback...`, { error: err.message });
+            recordFailure('yahoo');
         }
-        log.debug(`Yahoo returned 0 results for query, trying Bing fallback...`);
-    } catch (err) {
-        log.debug(`Yahoo search failed, trying Bing fallback...`, { error: err.message });
     }
-
-    await jitter(500, 1200);
 
     // Fallback to Bing
-    try {
-        const results = await searchBing(query, maxResults);
-        if (results.length > 0) {
-            log.debug(`Bing fallback returned ${results.length} results.`);
-            return results;
+    if (!engineHealth.bing.isDead) {
+        await jitter(500, 1200);
+        try {
+            const results = await searchBing(query, maxResults);
+            if (results.length > 0) {
+                log.debug(`Bing fallback returned ${results.length} results.`);
+                recordSuccess('bing');
+                return results;
+            }
+            recordFailure('bing');
+        } catch (err) {
+            log.debug(`Bing fallback also failed.`, { error: err.message });
+            recordFailure('bing');
         }
-    } catch (err) {
-        log.debug(`Bing fallback also failed.`, { error: err.message });
     }
 
-    await jitter(400, 1000);
-
     // Final fallback: DuckDuckGo HTML search
-    try {
-        const results = await searchDuckDuckGo(query, maxResults);
-        if (results.length > 0) {
-            log.debug(`DuckDuckGo fallback returned ${results.length} results.`);
-            return results;
+    if (!engineHealth.ddg.isDead) {
+        await jitter(400, 1000);
+        try {
+            const results = await searchDuckDuckGo(query, maxResults);
+            if (results.length > 0) {
+                log.debug(`DuckDuckGo fallback returned ${results.length} results.`);
+                recordSuccess('ddg');
+                return results;
+            }
+            recordFailure('ddg');
+        } catch (err) {
+            log.debug(`DuckDuckGo fallback also failed.`, { error: err.message });
+            recordFailure('ddg');
         }
-    } catch (err) {
-        log.debug(`DuckDuckGo fallback also failed.`, { error: err.message });
     }
 
     // All failed
-    log.warning(`SELECTOR_BROKEN: Yahoo, Bing, and DuckDuckGo all returned 0 results. Possible rate-limiting or selector change.`);
+    log.warning(`SELECTOR_BROKEN or RATE_LIMITED: Yahoo, Bing, and DuckDuckGo failed to return results.`);
     return [];
 }
 

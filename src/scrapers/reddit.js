@@ -92,6 +92,15 @@ export async function scrapeReddit(companies, maxResults = 10) {
                             subreddit = `r/${subMatch[1]}`;
                         }
 
+                        const estimatedDateObj = parseOrEstimatePostDate(snippet, urlPath, 'reddit');
+                        const ageMs = Date.now() - new Date(estimatedDateObj.createdAt || new Date()).getTime();
+                        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+
+                        // Pre-filter: Don't count old posts toward maxResults limit
+                        if (ageDays > 90) {
+                            continue;
+                        }
+
                         signals.push({
                             company,
                             source: 'reddit',
@@ -100,7 +109,7 @@ export async function scrapeReddit(companies, maxResults = 10) {
                             url: urlPath,
                             author: 'Reddit User',
                             subreddit: subreddit,
-                            ...parseOrEstimatePostDate(snippet, urlPath, 'reddit'),
+                            ...estimatedDateObj,
                             scrapedAt: new Date().toISOString()
                         });
                     }

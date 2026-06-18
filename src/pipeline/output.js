@@ -64,6 +64,21 @@ export async function outputResults({
         FINAL_PUSH_COUNTS: {}
     };
 
+    const diagnostics = {
+        fetched: enrichedSignals.length,
+        accepted: 0,
+        rejected: {
+            older_than_90_days: 0,
+            developer_noise: 0,
+            low_intent: 0,
+            low_priority: 0,
+            blacklisted: 0,
+            missing_metadata: 0,
+            invalid: 0
+        },
+        sources: {}
+    };
+
     let chargedSignals = 0;
     const buyingSignals = [];
     const smartAlerts = [];
@@ -77,13 +92,21 @@ export async function outputResults({
         signal.contentAgeDays = ageDays;
 
         // HARD 90-DAY CUTOFF — No exceptions.
-        // Old signals are NOT actionable buying intelligence. A Reddit post from 2022
-        // saying "switching from Salesforce" is useless in 2026 — that decision is long
-        // made. The after: search operators don't work on Yahoo/Bing, so this is the
-        // real enforcement layer.
         if (ageDays > 90) {
             signal.signalQuality = 'REJECT';
             signal.rejectionReason = `Content too old (${ageDays} days). Buying signals must be ≤90 days.`;
+        }
+
+        // Track reason for rejection if already rejected upstream
+        if (signal.signalQuality === 'REJECT') {
+            if (signal.rejectionReason && signal.rejectionReason.toLowerCase().includes('noise')) {
+                diagnostics.rejected.developer_noise++;
+            } else if (signal.rejectionReason && signal.rejectionReason.toLowerCase().includes('old')) {
+                diagnostics.rejected.older_than_90_days++;
+            } else {
+                diagnostics.rejected.low_intent++;
+            }
+            continue;
         }
 
         if (ageDays <= 7 && signal.dateSource === 'actual') {
@@ -103,6 +126,7 @@ export async function outputResults({
 
         // STRICT FILTERING: Drop noisy / rejected signals completely
         if (signal.signalQuality === 'REJECT') {
+            // Already tracked above
             continue;
         }
 
@@ -113,6 +137,7 @@ export async function outputResults({
         const isHighIntent = signal.leadPriority === 'URGENT' ||
             signal.leadPriority === 'HIGH';
         if (!isHighIntent) {
+            diagnostics.rejected.low_priority++;
             continue;
         }
 
@@ -125,14 +150,18 @@ export async function outputResults({
         const badTitleCheck = /(artifact|hash|semantic|epic|rebranding|migration|internal)/i;
         if (!signal.title || signal.title.toLowerCase().includes('undefined') || badTitleCheck.test(signal.title)) {
             log.warning('INVALID_SIGNAL_REJECTED (Missing fields or bad title keywords)');
+            diagnostics.rejected.invalid++;
             continue;
         }
         if (signal.intentScore === undefined || !signal.source || !signal.company || !signal.url) {
             log.warning('INVALID_SIGNAL_REJECTED (Missing required schema fields)');
+            diagnostics.rejected.missing_metadata++;
             continue;
         }
 
         buyingSignals.push(signal);
+        diagnostics.accepted++;
+        diagnostics.sources[signal.source] = (diagnostics.sources[signal.source] || 0) + 1;
         forensics.FINAL_PUSH_COUNTS[signal.source] = (forensics.FINAL_PUSH_COUNTS[signal.source] || 0) + 1;
         chargedSignals++;
 
@@ -240,6 +269,7 @@ export async function outputResults({
 
     // Save Premium Executive Summary to KVS
     await Actor.setValue('EXECUTIVE_SUMMARY', runSummary);
+    await Actor.setValue('diagnostics', diagnostics);
 
     // Save Markdown version
     const mdSummary = `

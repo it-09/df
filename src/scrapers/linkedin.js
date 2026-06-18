@@ -136,6 +136,15 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                             continue;
                         }
 
+                        const estimatedDateObj = parseOrEstimatePostDate(snippet, urlPath, 'linkedin');
+                        const ageMs = Date.now() - new Date(estimatedDateObj.createdAt || new Date()).getTime();
+                        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+
+                        // Pre-filter: Don't count old posts toward maxResults limit
+                        if (ageDays > 90) {
+                            continue;
+                        }
+
                         signals.push({
                             company,
                             source: 'linkedin',
@@ -145,7 +154,7 @@ export async function scrapeLinkedIn(companies, maxResults = 10) {
                             author,
                             sourceCategory: 'linkedin_posts',
                             detectedRole: detectedRole,
-                            ...parseOrEstimatePostDate(snippet, urlPath, 'linkedin'),
+                            ...estimatedDateObj,
                             scrapedAt: new Date().toISOString()
                         });
                     }

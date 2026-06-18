@@ -41,6 +41,13 @@ export async function axiosWithRetry(config, retries = 3) {
                 headers: { ...{ 'User-Agent': nextUserAgent(), 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5' }, ...(config.headers || {}) }
             });
         } catch (err) {
+            // Fast-fail: If the server explicitly rate-limits or blocks us, do not retry.
+            // Retrying a 429/403 just wastes Apify compute time and runs up the $0.10 cost limit.
+            if (err.response && [401, 403, 429].includes(err.response.status)) {
+                log.debug(`Fast-fail triggered (HTTP ${err.response.status}). Rate limited or blocked.`);
+                throw err;
+            }
+
             if (attempt === retries) throw err;
             const delay = Math.min(1500 * Math.pow(2, attempt - 1), 8000);
             log.debug(`HTTP request failed (attempt ${attempt}/${retries}), retrying in ${delay}ms...`, { error: err.message });

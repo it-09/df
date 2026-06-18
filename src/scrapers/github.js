@@ -10,7 +10,8 @@ import { axiosWithRetry } from '../utils/http.js';
  * @returns {Promise<Array>} - Array of signals
  */
 export async function scrapeGitHub(companies, maxResults = 10) {
-    const perPage = Math.min(maxResults, 30);
+    // Fetch more raw items to account for aggressive noise filtering
+    const perPage = Math.min(Math.max(maxResults * 3, 30), 100);
 
     const results = await Promise.allSettled(
         companies.map(async (company) => {
@@ -38,6 +39,8 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                 if (response.data && response.data.items) {
                     rawCount = response.data.items.length;
                     for (const item of response.data.items) {
+                        if (signals.length >= maxResults) break;
+
                         const title = item.title || '';
                         const body = (item.body || '').substring(0, 2000);
                         const fullText = (title + " " + body).toLowerCase();
