@@ -120,6 +120,16 @@ export async function outputResults({
             continue;
         }
 
+        // HIGH-INTENT FILTER: Only surface signals with genuine buyer intent.
+        // LOW/MEDIUM signals are still processed for aggregation above but
+        // must NOT pollute the buying-signals dataset output.
+        const isHighIntent = signal.leadPriority === 'URGENT' ||
+            signal.leadPriority === 'HIGH' ||
+            (typeof signal.intentScore === 'number' && signal.intentScore >= 60);
+        if (!isHighIntent) {
+            continue;
+        }
+
         // Truncate content for payload safety
         if (signal.content && signal.content.length > 1500) {
             signal.content = signal.content.substring(0, 1500) + '... [TRUNCATED]';
@@ -182,14 +192,26 @@ export async function outputResults({
         log.warning(`INVALID_SIGNAL_REJECTED: Dropped ${buyingSignals.length - finalRows.length} invalid signals just before dataset push.`);
     }
 
+    // Sort by recency: most recent signals first so users see the freshest intelligence at top.
+    finalRows.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        // Secondary sort: higher intentScore wins when dates are equal or missing
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.intentScore || 0) - (a.intentScore || 0);
+    });
+
     const isValid = finalRows.every(r => r.title && r.company && r.source);
     if (!isValid) {
         log.warning('ASSERTION FAILED: Invalid rows detected in final array. Skipping invalid rows.');
     } else if (finalRows.length > 0) {
+        log.info(`High-intent buying signals ready to push: ${finalRows.length} (filtered from ${enrichedSignals.length} total signals).`);
         const payloadSizeKB = (Buffer.byteLength(JSON.stringify(finalRows), 'utf8') / 1024).toFixed(2);
         log.info(`Serialized payload size: ${payloadSizeKB} KB`);
         await pushDataToApify(finalRows, 'signals');
-        log.info('Dataset persistence complete (Buying Signals).');
+        log.info('Dataset persistence complete (Buying Signals — HIGH/URGENT intent only, sorted most-recent-first).');
+    } else {
+        log.warning('No high-intent signals met the threshold (leadPriority HIGH/URGENT or intentScore >= 60). Dataset push skipped.');
     }
     
     // Save smart alerts to Key-Value Store instead of Dataset
