@@ -19,44 +19,20 @@ export async function outputResults({
     datasetId
 }) {
     async function pushDataToApify(items, typeLabel = 'data') {
-        if (!token || !datasetId) {
-            log.warning(`Missing APIFY_TOKEN or APIFY_DEFAULT_DATASET_ID. Using local Actor.pushData fallback for ${typeLabel}.`);
-            await Actor.pushData(items);
-            return;
-        }
-        const url = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`;
-        
         const dataArray = Array.isArray(items) ? items : [items];
         if (dataArray.length === 0) return;
 
-        const CHUNK_SIZE = 5;
-        const totalChunks = Math.ceil(dataArray.length / CHUNK_SIZE);
+        if (process.env.DEBUG_MODE === 'true') {
+            console.log(`Persisting ${dataArray.length} items to default dataset...`);
+        }
 
-        for (let i = 0; i < totalChunks; i++) {
-            const chunk = dataArray.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        try {
+            await Actor.pushData(dataArray);
             if (process.env.DEBUG_MODE === 'true') {
-                console.log(`Persisting ${typeLabel} chunk ${i + 1}/${totalChunks}...`);
+                console.log(`✅ ${typeLabel} persisted to default dataset successfully.`);
             }
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(chunk)
-                });
-                if (process.env.DEBUG_MODE === 'true') {
-                    console.log(`POST status: ${response.status}`);
-                    if (response.ok) {
-                        console.log(`✅ chunk persisted`);
-                    } else {
-                        console.error(`❌ chunk failed`, await response.text());
-                    }
-                }
-            } catch (e) {
-                console.error(`❌ fetch error for chunk`, e);
-            }
+        } catch (e) {
+            console.error(`❌ Actor.pushData error for ${typeLabel}`, e);
         }
     }
 
