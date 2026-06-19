@@ -1,7 +1,7 @@
 # 🌑 Dark Funnel Intelligence Engine
 
 <a href="https://apify.com"><img src="https://img.shields.io/badge/hosted%20on-apify-blue?style=flat-square&logo=apify" alt="Hosted on Apify"></a>
-<a href="https://github.com/apify/dark-funnel-intelligence-engine/blob/main/LICENSE"><img src="https://img.shields.io/github/license/apify/dark-funnel-intelligence-engine?style=flat-square" alt="License"></a>
+
 
 ---
 
