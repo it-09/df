@@ -1,6 +1,5 @@
 import { log } from 'apify';
-import { gotScraping } from 'got-scraping';
-import * as cheerio from 'cheerio';
+import { searchWeb } from '../utils/searchEngine.js';
 import { parseOrEstimatePostDate } from '../utils/normalizer.js';
 import { isSeoSpam, hasHumanIntent } from '../utils/spamPatterns.js';
 
@@ -50,27 +49,7 @@ export async function scrapeReddit(companies, maxResults = 10) {
                 const searchQuery = `site:reddit.com ${q}${hasAfterFilter ? '' : ' ' + afterFilter}`;
                 
                 try {
-                    // Direct old.reddit.com search instead of Yahoo/Bing dorking
-                    // old.reddit.com provides HTML without JS rendering
-                    const url = `https://old.reddit.com/search?q=${encodeURIComponent(q)}&sort=new`;
-                    
-                    const response = await gotScraping({
-                        url,
-                        responseType: 'text',
-                        timeout: { request: 15000 }
-                    });
-                    
-                    const $ = cheerio.load(response.body);
-                    const searchResults = [];
-                    
-                    $('.search-result').each((i, el) => {
-                        const title = $(el).find('.search-title').text().trim();
-                        const resultUrl = $(el).find('.search-title').attr('href');
-                        const snippet = $(el).find('.search-expando').text().trim() || $(el).find('.search-result-body').text().trim();
-                        if (title && resultUrl) {
-                            searchResults.push({ title, url: resultUrl.startsWith('/') ? 'https://reddit.com' + resultUrl : resultUrl, snippet });
-                        }
-                    });
+                    const searchResults = await searchWeb(searchQuery, Math.ceil((maxResults + 5) / queries.length));
 
                     for (const result of searchResults) {
                         if (signals.length >= maxResults) break;

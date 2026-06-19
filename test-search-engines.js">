@@ -1,0 +1,84 @@
+import * as cheerio from 'cheerio';
+import { axiosWithRetry } from './src/utils/http.js';
+
+async function testBing() {
+    console.log('=== Testing Bing search ===');
+    const query = 'site:reddit.com reddit';
+    const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=10`;
+    const response = await axiosWithRetry({ method: 'GET', url });
+    console.log('Status:', response.status);
+    if (response.status !== 200) {
+        console.error('Bing failed with status:', response.status);
+        return [];
+    }
+
+    const $ = cheerio.load(response.data);
+    const results = [];
+
+    console.log('Looking for li.b_algo elements...');
+    const algos = $('li.b_algo');
+    console.log(`Found ${algos.length} li.b_algo elements`);
+    algos.each((i, el) => {
+        const title = $(el).find('h2').text().trim();
+        const resultUrl = $(el).find('h2 a').attr('href');
+        const snippet = $(el).find('.b_caption p').text().trim();
+        console.log(`  Result ${i}: title="${title}", url="${resultUrl}"`);
+        if (title || snippet) {
+            results.push({ title, url: resultUrl, snippet });
+        }
+    });
+    return results;
+}
+
+async function testDuckDuckGo() {
+    console.log('\n=== Testing DuckDuckGo HTML search ===');
+    const query = 'site:reddit.com reddit';
+    const response = await axiosWithRetry({
+        method: 'POST',
+        url: 'https://html.duckduckgo.com/html/',
+        data: `q=${encodeURIComponent(query)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    console.log('Status:', response.status);
+    if (response.status !== 200) {
+        console.error('DDG failed with status:', response.status);
+        return [];
+    }
+
+    const $ = cheerio.load(response.data);
+    const results = [];
+
+    console.log('Looking for .result elements...');
+    const resultEls = $('.result');
+    console.log(`Found ${resultEls.length} .result elements`);
+    resultEls.each((i, el) => {
+        const title = $(el).find('.result__title').text().trim();
+        let resultUrl = $(el).find('.result__url').text().trim();
+        if (!resultUrl) resultUrl = $(el).find('a.result__a').attr('href');
+        if (resultUrl && resultUrl.startsWith('//duckduckgo.com/l/')) {
+            const uddMatch = resultUrl.match(/uddg=([^&]+)/);
+            if (uddMatch) resultUrl = decodeURIComponent(uddMatch[1]);
+        }
+        const snippet = $(el).find('.result__snippet').text().trim();
+        console.log(`  Result ${i}: title="${title}", url="${resultUrl}"`);
+        if (title && resultUrl) {
+            results.push({ title, url: resultUrl, snippet });
+        }
+    });
+    return results;
+}
+
+async function testAll() {
+    const bingResults = await testBing();
+    const ddgResults = await testDuckDuckGo();
+
+    console.log('\n=== Summary ===');
+    console.log('Bing results:', bingResults.length);
+    console.log('DDG results:', ddgResults.length);
+}
+
+testAll().catch(err => {
+    console.error('ERROR:', err);
+    process.exit(1);
+});

@@ -1,0 +1,7 @@
+
+import os
+for filename in os.listdir('.'):
+    if filename.endswith('.js>'):
+        new_filename = filename[:-1]
+        print(f"Renaming {filename} to {new_filename}")
+        os.rename(filename, new_filename)
