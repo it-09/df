@@ -68,6 +68,7 @@
             "type": "boolean",
             "description": "Scrape Reddit posts via Yahoo Search Dorking. Bypasses all Reddit bot-detection natively.",
             "default": true,
+            "editor": "checkbox",
             "sectionCaption": "Data Sources",
             "sectionDescription": "Choose which sources to scan."
         },
@@ -75,31 +76,36 @@
             "title": "Enable GitHub",
             "type": "boolean",
             "description": "Search GitHub Issues for company mentions via the public API. Free, no API key needed. Rate limit: 60 requests/hour.",
-            "default": true
+            "default": true,
+            "editor": "checkbox"
         },
         "enableHackernews": {
             "title": "Enable Hacker News",
             "type": "boolean",
             "description": "Search Hacker News stories and comments via the free Algolia API. No API key needed, no rate limit.",
-            "default": true
+            "default": true,
+            "editor": "checkbox"
         },
         "enableNews": {
             "title": "Enable News API",
             "type": "boolean",
             "description": "Search news articles via NewsAPI.org. Requires a free API key (100 requests/day). Get one at https://newsapi.org.",
-            "default": false
+            "default": false,
+            "editor": "checkbox"
         },
         "enableG2": {
             "title": "Enable G2 Reviews",
             "type": "boolean",
             "description": "Scrape highly commercial G2 Reviews via Google Dorking to bypass Cloudflare. (Recommended)",
-            "default": true
+            "default": true,
+            "editor": "checkbox"
         },
         "enableLinkedin": {
             "title": "Enable LinkedIn",
             "type": "boolean",
             "description": "Scrape public LinkedIn posts via search engine Dorking for high-intent professional discussions.",
-            "default": true
+            "default": true,
+            "editor": "checkbox"
         },
         "newsApiKey": {
             "title": "News API Key",
@@ -129,24 +135,30 @@
             "title": "Skip Language Filter",
             "type": "boolean",
             "description": "If true, skip filtering out non-English content. Use this if you monitor non-English markets.",
-            "default": false
+            "default": false,
+            "editor": "checkbox"
         },
         "forceEnableAll": {
             "title": "Force Enable All",
             "type": "boolean",
             "description": "If true, bypass circuit breakers and enable all scrapers even if they've had consecutive failures (for debugging).",
-            "default": false
+            "default": false,
+            "editor": "checkbox"
         },
         "webhookUrl": {
             "title": "Webhook URL",
             "type": "string",
-            "description": "URL to send POST requests with high-intent signals."
+            "description": "URL to send POST requests with high-intent signals.",
+            "editor": "textfield"
         },
         "webhookBatchSize": {
             "title": "Webhook Batch Size",
             "type": "integer",
             "description": "Number of high-intent signals to send per webhook request.",
-            "default": 25
+            "default": 25,
+            "editor": "number",
+            "minimum": 1,
+            "maximum": 100
         }
     },
     "required": [
