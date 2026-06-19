@@ -140,8 +140,7 @@
         "webhookUrl": {
             "title": "Webhook URL",
             "type": "string",
-            "description": "URL to send POST requests with high-intent signals.",
-            "default": null
+            "description": "URL to send POST requests with high-intent signals."
         },
         "webhookBatchSize": {
             "title": "Webhook Batch Size",
