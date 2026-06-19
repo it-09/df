@@ -124,6 +124,30 @@
             ],
             "sectionCaption": "Competitive Intelligence",
             "sectionDescription": "Track competitor mentions alongside your target companies."
+        },
+        "skipLanguageFilter": {
+            "title": "Skip Language Filter",
+            "type": "boolean",
+            "description": "If true, skip filtering out non-English content. Use this if you monitor non-English markets.",
+            "default": false
+        },
+        "forceEnableAll": {
+            "title": "Force Enable All",
+            "type": "boolean",
+            "description": "If true, bypass circuit breakers and enable all scrapers even if they've had consecutive failures (for debugging).",
+            "default": false
+        },
+        "webhookUrl": {
+            "title": "Webhook URL",
+            "type": "string",
+            "description": "URL to send POST requests with high-intent signals.",
+            "default": null
+        },
+        "webhookBatchSize": {
+            "title": "Webhook Batch Size",
+            "type": "integer",
+            "description": "Number of high-intent signals to send per webhook request.",
+            "default": 25
         }
     },
     "required": [

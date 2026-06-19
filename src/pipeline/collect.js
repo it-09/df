@@ -1,7 +1,7 @@
 // Pipeline Stage 1: Multi-Source Signal Collection
 // Runs all enabled scrapers in parallel with timing and error handling
 
-import { log } from 'apify';
+import { Actor, log } from 'apify';
 import { scrapeReddit } from '../scrapers/reddit.js';
 import { scrapeGitHub } from '../scrapers/github.js';
 import { scrapeHackerNews } from '../scrapers/hackernews.js';
@@ -16,83 +16,130 @@ import { scrapeLinkedIn } from '../scrapers/linkedin.js';
  * @param {Object} resolvedSources - Source toggle map { reddit: bool, github: bool, ... }
  * @param {number} maxResults - Max results per company per source
  * @param {string|null} newsApiKey - Optional News API key
- * @returns {Promise<{signals: Array, pipelineTimings: Object}>}
+ * @param {Object} consecutiveFailuresParam - Consecutive failure counts per source fallback
+ * @param {boolean} forceEnableAll - Override circuit breakers
+ * @returns {Promise<{signals: Array, pipelineTimings: Object, consecutiveFailures: Object}>}
  */
-export async function collectSignals(companies, resolvedSources, maxResults, newsApiKey = null) {
+export async function collectSignals(companies, resolvedSources, maxResults, newsApiKey = null, consecutiveFailuresParam = {}, forceEnableAll = false) {
     const pipelineTimings = {};
     const scraperTasks = [];
+    
+    // Load consecutiveFailures from KVS
+    let store;
+    let state = {};
+    let consecutiveFailures = {};
+    try {
+        store = await Actor.openKeyValueStore('dark-funnel-monitor-state');
+        state = await store.getValue('STATE') || {};
+        consecutiveFailures = state.consecutiveFailures || {};
+    } catch (e) {
+        log.warning('Failed to load consecutive failures from KVS, using parameter', { error: e.message });
+        consecutiveFailures = consecutiveFailuresParam || {};
+    }
+
+    const updatedFailures = { ...consecutiveFailures };
 
     // Build an array of scraper promises to run in parallel
     if (resolvedSources.reddit) {
-        scraperTasks.push({
-            name: 'reddit',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeReddit(companies, maxResults);
-                pipelineTimings.reddit = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.reddit || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] reddit disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] reddit disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'reddit',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeReddit(companies, maxResults);
+                    pipelineTimings.reddit = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     if (resolvedSources.github) {
-        scraperTasks.push({
-            name: 'github',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeGitHub(companies, maxResults);
-                pipelineTimings.github = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.github || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] github disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] github disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'github',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeGitHub(companies, maxResults);
+                    pipelineTimings.github = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     if (resolvedSources.hackernews) {
-        scraperTasks.push({
-            name: 'hackernews',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeHackerNews(companies, maxResults);
-                pipelineTimings.hackernews = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.hackernews || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] hackernews disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] hackernews disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'hackernews',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeHackerNews(companies, maxResults);
+                    pipelineTimings.hackernews = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     if (resolvedSources.news && newsApiKey) {
-        scraperTasks.push({
-            name: 'news',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeNews(companies, newsApiKey, maxResults);
-                pipelineTimings.news = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.news || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] news disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] news disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'news',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeNews(companies, newsApiKey, maxResults);
+                    pipelineTimings.news = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     if (resolvedSources.g2) {
-        scraperTasks.push({
-            name: 'g2',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeG2(companies, maxResults);
-                pipelineTimings.g2 = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.g2 || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] g2 disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] g2 disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'g2',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeG2(companies, maxResults);
+                    pipelineTimings.g2 = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     if (resolvedSources.linkedin) {
-        scraperTasks.push({
-            name: 'linkedin',
-            promise: (async () => {
-                const t0 = Date.now();
-                const signals = await scrapeLinkedIn(companies, maxResults);
-                pipelineTimings.linkedin = Date.now() - t0;
-                return signals;
-            })()
-        });
+        if (!forceEnableAll && (updatedFailures.linkedin || 0) >= 3) {
+            console.warn(`[CIRCUIT BREAKER] linkedin disabled after 3 consecutive failures`);
+            log.warning(`[CIRCUIT BREAKER] linkedin disabled after 3 consecutive failures`);
+        } else {
+            scraperTasks.push({
+                name: 'linkedin',
+                promise: (async () => {
+                    const t0 = Date.now();
+                    const signals = await scrapeLinkedIn(companies, maxResults);
+                    pipelineTimings.linkedin = Date.now() - t0;
+                    return signals;
+                })()
+            });
+        }
     }
 
     // Run all scrapers in parallel
@@ -105,10 +152,41 @@ export async function collectSignals(companies, resolvedSources, maxResults, new
         
         if (result.status === 'fulfilled') {
             allSignals.push(...result.value);
+            updatedFailures[task.name] = 0;
             log.info(`${task.name}: ${result.value.length} signals collected`);
         } else {
+            updatedFailures[task.name] = (updatedFailures[task.name] || 0) + 1;
             log.warning(`${task.name} scraping failed, continuing with other sources`, { error: result.reason?.message });
         }
+    }
+
+    // Persist updated failure counts back to KVS after each run
+    try {
+        if (!store) {
+            store = await Actor.openKeyValueStore('dark-funnel-monitor-state');
+        }
+        state.consecutiveFailures = updatedFailures;
+        await store.setValue('STATE', state);
+    } catch (e) {
+        log.warning('Failed to save consecutive failures to KVS', { error: e.message });
+    }
+
+    // Early Date Filter
+    const cutoffDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const cutoffIso = cutoffDate.toISOString();
+    let droppedCount = 0;
+    const filteredSignals = allSignals.filter(signal => {
+        if (signal.dateSource === 'actual' && signal.createdAt && new Date(signal.createdAt) < new Date(cutoffIso)) {
+            droppedCount++;
+            return false;
+        }
+        if (signal.dateSource === 'inferred') {
+            signal.inferredDateRisk = true;
+        }
+        return true;
+    });
+    if (droppedCount > 0) {
+        log.info(`Early date filter dropped ${droppedCount} signals older than 90 days`);
     }
 
     // Pipeline timing summary
@@ -127,5 +205,5 @@ export async function collectSignals(companies, resolvedSources, maxResults, new
         log.info('-------------------------------');
     }
 
-    return { signals: allSignals, pipelineTimings };
+    return { signals: filteredSignals, pipelineTimings, consecutiveFailures: updatedFailures };
 }

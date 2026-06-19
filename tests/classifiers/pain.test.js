@@ -23,4 +23,35 @@ describe('pain classifier', () => {
         expect(result.severity).toBe(0);
         expect(result.confidence).toBe(0);
     });
+
+    it('should apply 1.4 multiplier for pricing + vendor_lock combo', () => {
+        const text = 'This product is too expensive and we are locked in, it\'s hard to leave.';
+        const result = detectPainSignals(text);
+        expect(result.compoundComboMatched).toBe('pricing+vendor_lock');
+        expect(result.painTypes).toContain('pricing');
+        expect(result.painTypes).toContain('vendor_lock');
+        // Check that severity is within reasonable range (capped at 1)
+        expect(result.severity).toBeGreaterThanOrEqual(0.8);
+        expect(result.severity).toBeLessThanOrEqual(1.0);
+    });
+
+    it('should apply highest multiplier when multiple combos match', () => {
+        const text = 'This product is too expensive, locked in, and missing features we need.';
+        const result = detectPainSignals(text);
+        // Should match pricing+vendor_lock (1.4) and pricing+feature_gap (1.3), so use 1.4
+        expect(result.compoundComboMatched).toBe('pricing+vendor_lock');
+    });
+
+    it('should NOT stack combo multipliers', () => {
+        const text = 'This product is too expensive, locked in, and missing features we need.';
+        const result = detectPainSignals(text);
+        // Even with multiple combos, the severity must not exceed 1.0 (it must cap gracefully)
+        expect(result.severity).toBeLessThanOrEqual(1.0);
+    });
+
+    it('should not apply any multiplier when no combo matches', () => {
+        const text = 'The support is terrible, but no other pain points.';
+        const result = detectPainSignals(text);
+        expect(result.compoundComboMatched).toBeNull();
+    });
 });

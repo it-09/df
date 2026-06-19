@@ -19,20 +19,21 @@ export function generateSignalHash(signal) {
 
 /**
  * Load the previous state from the Named Key-Value Store
- * @returns {Promise<Object>} - { seenHashes: Set, previousStats: Object }
+ * @returns {Promise<Object>} - { seenHashes: Set, previousStats: Object, consecutiveFailures: Object }
  */
 export async function loadMonitorState() {
     try {
         const store = await Actor.openKeyValueStore(STATE_STORE_NAME);
-        const state = await store.getValue('STATE') || { seenHashes: [], previousStats: {} };
+        const state = await store.getValue('STATE') || { seenHashes: [], previousStats: {}, consecutiveFailures: {} };
         
         return {
             seenHashes: new Set(state.seenHashes || []),
-            previousStats: state.previousStats || {}
+            previousStats: state.previousStats || {},
+            consecutiveFailures: state.consecutiveFailures || {}
         };
     } catch (err) {
         log.warning('Failed to load monitor state, starting fresh.', { error: err.message });
-        return { seenHashes: new Set(), previousStats: {} };
+        return { seenHashes: new Set(), previousStats: {}, consecutiveFailures: {} };
     }
 }
 
@@ -40,8 +41,9 @@ export async function loadMonitorState() {
  * Save the current state to the Named Key-Value Store
  * @param {Set} seenHashes - Set of all seen hashes
  * @param {Object} currentStats - Aggregated company stats from this run
+ * @param {Object} consecutiveFailures - Consecutive failure counts per source
  */
-export async function saveMonitorState(seenHashes, currentStats) {
+export async function saveMonitorState(seenHashes, currentStats, consecutiveFailures) {
     try {
         // Keep only the most recent N hashes to prevent memory bloat
         const hashesArray = Array.from(seenHashes);
@@ -50,7 +52,8 @@ export async function saveMonitorState(seenHashes, currentStats) {
         const state = {
             lastRun: new Date().toISOString(),
             seenHashes: trimmedHashes,
-            previousStats: currentStats
+            previousStats: currentStats,
+            consecutiveFailures: consecutiveFailures || {}
         };
         
         const store = await Actor.openKeyValueStore(STATE_STORE_NAME);

@@ -12,6 +12,8 @@ import { axiosWithRetry } from '../utils/http.js';
 export async function scrapeGitHub(companies, maxResults = 10) {
     // Fetch more raw items to account for aggressive noise filtering
     const perPage = Math.min(Math.max(maxResults * 3, 30), 100);
+    // Cache repo star counts to avoid duplicate API calls
+    const repoStarCache = new Map();
 
     const results = await Promise.allSettled(
         companies.map(async (company) => {
@@ -81,6 +83,32 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                             continue; 
                         }
 
+                        // Get repository stars
+                        const repoFullName = item.repository_url?.split('/').slice(-2).join('/') || '';
+                        let repoStars = 0;
+                        
+                        if (repoFullName) {
+                            if (repoStarCache.has(repoFullName)) {
+                                repoStars = repoStarCache.get(repoFullName);
+                            } else {
+                                try {
+                                    const repoUrl = `https://api.github.com/repos/${repoFullName}`;
+                                    const repoResponse = await axiosWithRetry({
+                                        method: 'GET',
+                                        url: repoUrl,
+                                        headers: {
+                                            'Accept': 'application/vnd.github.v3+json',
+                                            'User-Agent': 'DarkFunnel-Actor/1.0'
+                                        }
+                                    });
+                                    repoStars = repoResponse.data?.stargazers_count || 0;
+                                    repoStarCache.set(repoFullName, repoStars);
+                                } catch (err) {
+                                    log.debug(`Failed to fetch repo data for ${repoFullName}`, { error: err.message });
+                                }
+                            }
+                        }
+
                         signals.push({
                             company,
                             source: 'github',
@@ -88,7 +116,8 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                             content: body,
                             url: item.html_url,
                             author: item.user?.login || 'unknown',
-                            repository: item.repository_url?.split('/').slice(-2).join('/') || '',
+                            repository: repoFullName,
+                            repoStars: repoStars,
                             createdAt: item.created_at,
                             dateSource: 'actual',
                             scrapedAt: new Date().toISOString()

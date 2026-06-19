@@ -8,6 +8,13 @@ const PAIN_PATTERNS = {
     vendor_lock: /(locked in|hard to leave|can.t export|data hostage|vendor lock|switching cost|hard to migrate|migration nightmare|expensive to leave|exit fee|cancellation fee|trapped)/i
 };
 
+const HIGH_VALUE_COMBOS = [ 
+    { types: ['pricing', 'vendor_lock'], multiplier: 1.4 }, 
+    { types: ['pricing', 'feature_gap'], multiplier: 1.3 }, 
+    { types: ['scaling', 'technical'], multiplier: 1.25 }, 
+    { types: ['support', 'usability'], multiplier: 1.2 }, 
+];
+
 export function detectPainSignals(text) {
     const painTypes = [];
     let severity = 0;
@@ -34,11 +41,26 @@ export function detectPainSignals(text) {
 
     // Compound pain boost: multiple pain types = more severe
     if (totalWeight >= 3) severity = Math.min(1, severity + 0.15);
+    
+    // Check for high-value combos and apply highest multiplier
+    let matchedCombo = null;
+    let highestMultiplier = 1;
+    for (const combo of HIGH_VALUE_COMBOS) {
+        const comboTypesPresent = combo.types.every(type => painTypes.includes(type));
+        if (comboTypesPresent && combo.multiplier > highestMultiplier) {
+            highestMultiplier = combo.multiplier;
+            matchedCombo = combo;
+        }
+    }
+    if (matchedCombo) {
+        severity = Math.min(1, severity * highestMultiplier);
+    }
 
     return {
         hasPainSignal: painTypes.length > 0,
         painTypes,
         severity: Math.min(1, severity),
-        confidence: painTypes.length > 0 ? Math.min(0.95, 0.5 + painTypes.length * 0.15) : 0
+        confidence: painTypes.length > 0 ? Math.min(0.95, 0.5 + painTypes.length * 0.15) : 0,
+        compoundComboMatched: matchedCombo ? matchedCombo.types.join('+') : null
     };
 }

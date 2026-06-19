@@ -18,6 +18,14 @@ describe('normalizer utility', () => {
         it('should return null if no match', () => {
             expect(fuzzyMatchCompany('Vercel', ['HubSpot', 'Salesforce'])).toBeNull();
         });
+
+        it('should NOT fuzzy match "Sage" vs "Page" (both <6 chars)', () => {
+            expect(fuzzyMatchCompany('Sage', ['Page', 'HubSpot'])).toBeNull();
+        });
+
+        it('should fuzzy match "HubSpot" vs "HubSpots" (both >=6 chars)', () => {
+            expect(fuzzyMatchCompany('HubSpots', ['HubSpot', 'Salesforce'])).toBe('HubSpot');
+        });
     });
 
     describe('cleanText', () => {

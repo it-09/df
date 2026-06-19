@@ -16,7 +16,10 @@ export async function outputResults({
     companyProfiles,
     validCompanies,
     token,
-    datasetId
+    datasetId,
+    consecutiveFailures,
+    webhookUrl,
+    webhookBatchSize = 25
 }) {
     async function pushDataToApify(items, typeLabel = 'data') {
         const dataArray = Array.isArray(items) ? items : [items];
@@ -87,7 +90,6 @@ export async function outputResults({
 
         if (ageDays <= 7 && signal.dateSource === 'actual') {
             signal.freshnessCategory = 'HOT';
-            signal.intentScore = Math.min(100, signal.intentScore + 10);
             signal.confidence = Math.min(1.0, (signal.confidence || 0.5) + 0.1);
             if (signal.signalQuality === 'MEDIUM') signal.signalQuality = 'HIGH';
         } else if (ageDays <= 7) {
@@ -96,7 +98,6 @@ export async function outputResults({
             signal.freshnessCategory = 'RECENT';
         } else if (ageDays <= 90) {
             signal.freshnessCategory = 'STALE';
-            signal.intentScore = Math.max(0, signal.intentScore - 15);
             if (signal.signalQuality === 'HIGH') signal.signalQuality = 'MEDIUM';
         }
 
@@ -195,6 +196,44 @@ export async function outputResults({
         await pushDataToApify(finalRows, 'signals');
         log.info('Dataset persistence complete (Buying Signals — HIGH/URGENT intent only, sorted most-recent-first).');
 
+        // Send Webhooks if configured
+        if (webhookUrl && finalRows.length > 0) {
+            log.info(`Sending ${finalRows.length} high-intent signals to webhook ${webhookUrl}`);
+            try {
+                // Batch signals into chunks of webhookBatchSize
+                const batches = [];
+                for (let i = 0; i < finalRows.length; i += webhookBatchSize) {
+                    batches.push(finalRows.slice(i, i + webhookBatchSize));
+                }
+
+                // Send each batch
+                for (const batch of batches) {
+                    const payload = {
+                        event: "high_intent_signal",
+                        signals: batch,
+                        actorRunId: process.env.APIFY_ACTOR_RUN_ID,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    const response = await fetch(webhookUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Webhook request failed with status ${response.status}: ${response.statusText}`);
+                    }
+
+                    log.info(`Successfully sent batch of ${batch.length} signals to webhook`);
+                }
+            } catch (err) {
+                log.error("Failed to send webhook requests", { error: err.message, stack: err.stack });
+            }
+        }
+
         // Charge per signal (PPE) after pushing data so the user retains what they pay for
         try {
             await Actor.charge({ eventName: 'result-signal', count: finalRows.length });
@@ -235,13 +274,11 @@ export async function outputResults({
     });
 
     // Save State for next run
-    if (monitoringMode !== 'off') {
-        const statsToSave = {};
-        for (const comp of aggregated) {
-            statsToSave[comp.company] = comp;
-        }
-        await saveMonitorState(seenHashes, statsToSave);
+    const statsToSave = {};
+    for (const comp of aggregated) {
+        statsToSave[comp.company] = comp;
     }
+    await saveMonitorState(seenHashes, statsToSave, consecutiveFailures);
 
     // Save Premium Executive Summary to KVS
     await Actor.setValue('EXECUTIVE_SUMMARY', runSummary);

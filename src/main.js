@@ -45,7 +45,11 @@ let {
     newsApiKey = null,
     monitoringMode = 'off',
     competitorWatch = [],
-    knownCompetitors = []
+    knownCompetitors = [],
+    skipLanguageFilter = false,
+    forceEnableAll = false,
+    webhookUrl = null,
+    webhookBatchSize = 25
 } = input;
 
 const openaiApiKey = process.env.OPENAI_API_KEY || null;
@@ -131,8 +135,8 @@ try {
         LLM_ACCEPT_COUNTS: {}
     };
 
-    // STAGE 1: Collect Signals (Parallel execution)
-    const { signals: allSignals } = await collectSignals(validCompanies, resolvedSources, maxResults, newsApiKey);
+    // STAGE 1: Collect signals (Parallel execution)
+    const { signals: allSignals, consecutiveFailures: updatedConsecutiveFailures } = await collectSignals(validCompanies, resolvedSources, maxResults, newsApiKey, monitorState.consecutiveFailures, forceEnableAll);
 
     if (allSignals.length === 0) {
         log.warning('No signals found. Try different company names or enable more sources.');
@@ -150,7 +154,7 @@ try {
     }
 
     // STAGE 2: Classify Signals (Heuristics & Noise Rejection)
-    const classifiedSignals = classifySignals(allSignals, validCompanies, knownCompetitors);
+    const classifiedSignals = classifySignals(allSignals, validCompanies, knownCompetitors, skipLanguageFilter);
 
     // STAGE 3: Qualify Signals (LLM Truth Layer)
     const qualifiedSignals = await qualifySignals(classifiedSignals, openaiApiKey, forensics);
@@ -168,7 +172,10 @@ try {
         companyProfiles,
         validCompanies,
         token,
-        datasetId
+        datasetId,
+        consecutiveFailures: updatedConsecutiveFailures,
+        webhookUrl,
+        webhookBatchSize
     });
 
     await Actor.setStatusMessage(`Complete: ${finalBuyingSignalCount} signals, ${highIntentAlertsCount} high-intent leads found.`, { isStatusMessageTerminal: true });

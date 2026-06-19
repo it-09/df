@@ -27,14 +27,17 @@ export function fuzzyMatchCompany(mention, companies) {
         }
     }
 
-    // Simple Levenshtein distance for typos
+    // Simple Levenshtein distance for typos - only if both are at least 6 chars
     for (const company of companies) {
-        const distance = levenshteinDistance(mentionLower, company.toLowerCase());
-        const maxLength = Math.max(mentionLower.length, company.length);
-        const similarity = 1 - (distance / maxLength);
+        const companyLower = company.toLowerCase();
+        if (mentionLower.length >= 6 && companyLower.length >= 6) {
+            const distance = levenshteinDistance(mentionLower, companyLower);
+            const maxLength = Math.max(mentionLower.length, companyLower.length);
+            const similarity = 1 - (distance / maxLength);
 
-        if (similarity > 0.8) {
-            return company;
+            if (similarity > 0.8) {
+                return company;
+            }
         }
     }
 

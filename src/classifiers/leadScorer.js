@@ -1,5 +1,11 @@
-export function calculateIntentScore(signals, sourceName = 'unknown', subreddit = '', daysOld = 0, isNoise = false) {
+export function calculateIntentScore(signals, sourceName = 'unknown', subreddit = '', daysOld = 0, isNoise = false, repoStars = 0) {
     let score = 10; // base
+    let painComboBoost = false;
+
+    if (signals.painSignals?.compoundComboMatched) {
+        score += 15;
+        painComboBoost = true;
+    }
 
     if (signals.buyingSignals?.hasBudgetSignal) score += 20;
     if (signals.buyingSignals?.hasEvaluationSignal) score += 20;
@@ -42,6 +48,12 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
         multiplier = 1.1; // LinkedIn is professional context
     } else if (sourceLower.includes('github')) {
         multiplier = 1.0; // GitHub issues are real buyer pain now that filters are stricter
+        // Add repo stars multiplier for GitHub signals
+        if (repoStars >= 5000) {
+            multiplier = 1.4;
+        } else if (repoStars >= 1000) {
+            multiplier = 1.2;
+        }
     }
     
     score = Math.round(score * multiplier);
@@ -49,18 +61,9 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
     // Noise penalty
     if (isNoise) score -= 50;
 
-    // Age penalties — softer when signal has explicit pain or switching intent
-    const isHighValueSignal = signals.switchSignals?.switchingDetected || 
-                               signals.painSignals?.severity > 0.3 ||
-                               signals.buyingSignals?.hasFrustrationSignal;
-
-    if (daysOld > 90) {
-        score -= isHighValueSignal ? 10 : 25; // Softer penalty for high-value old signals
-    } else if (daysOld > 30) {
-        score -= 5;
-    } else if (daysOld <= 7) {
-        score += 15; // Freshness boost
-    }
+    // Smooth exponential decay recency multiplier
+    const recencyMultiplier = Math.exp(-0.03 * daysOld);
+    score = Math.round(score * recencyMultiplier);
 
     score = Math.max(0, score);
     
@@ -75,7 +78,9 @@ export function calculateIntentScore(signals, sourceName = 'unknown', subreddit 
 
     return {
         intentScore: Math.min(100, score),
-        intentLevel: score >= 60 ? 'HIGH' : (score >= 30 ? 'MEDIUM' : 'LOW')
+        intentLevel: score >= 60 ? 'HIGH' : (score >= 30 ? 'MEDIUM' : 'LOW'),
+        painComboBoost,
+        recencyMultiplier
     };
 }
 
