@@ -12,7 +12,8 @@ vi.mock('apify', async () => ({
     log: {
         info: vi.fn(),
         warning: vi.fn(),
-        error: vi.fn()
+        error: vi.fn(),
+        debug: vi.fn()
     }
 }));
 

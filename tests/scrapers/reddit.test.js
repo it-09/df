@@ -75,7 +75,7 @@ describe('Reddit Scraper', () => {
         // Ensure Actor.call was called with correct parameters
         expect(Actor.call).toHaveBeenCalledWith('spry_wholemeal/reddit-scraper', {
             mode: 'search',
-            searchTargets: [{ query: 'HubSpot', maxResults: 20 }],
+            searchTargets: [{ query: 'HubSpot', maxResults: 30 }],
             timeframe: 'month'
         });
     });

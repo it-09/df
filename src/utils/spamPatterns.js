@@ -35,6 +35,60 @@ export const HUMAN_INTENT_PATTERNS = [
     /\bhate\b/i, /\bterrible\b/i, /\bawful\b/i, /\bdislike\b/i
 ];
 
+// Marketplace and product listing patterns
+export const MARKETPLACE_PATTERNS = [
+    /\bebay\b/i,
+    /\bamazon\.com\b/i,
+    /\betsy\b/i,
+    /\bcraigslist\b/i,
+    /\bfacebook\s*marketplace\b/i,
+    /\bmercari\b/i,
+    /\bposhmark\b/i,
+    /\bofferup\b/i,
+    /\bletgo\b/i,
+    /\bdepop\b/i,
+    /\bbuy\s+now\b/i,
+    /\bfree\s+shipping\b/i,
+    /\badd\s+to\s+cart\b/i,
+    /\bcheck\s+out\s+my\b/i,
+    /\bselling\s+my\b/i,
+    /\bfor\s+sale\b/i,
+    /\bauction\b/i,
+    /\bproduct\s+listing\b/i,
+    /\bstorefront\b/i,
+];
+
+// Personal story patterns (non-B2B)
+export const PERSONAL_STORY_PATTERNS = [
+    /\bi\s+worked\s+as\s+a\b/i,
+    /\bmy\s+experience\s+as\b/i,
+    /\bi\s+got\s+fired\b/i,
+    /\bmy\s+career\s+as\b/i,
+    /\bi\s+was\s+a\s+receptionist\b/i,
+    /\bwhen\s+i\s+was\s+a\b/i,
+    /\bmy\s+job\s+as\b/i,
+    /\bi\s+quit\s+my\s+job\b/i,
+    /\bmy\s+boss\b/i,
+    /\bmy\s+coworker\b/i,
+    /\bpersonal\s+story\b/i,
+    /\bmy\s+life\b/i,
+];
+
+// Generic AI discussion patterns (no buying intent)
+export const GENERIC_AI_PATTERNS = [
+    /\bwhat\s+is\s+ai\b/i,
+    /\bfuture\s+of\s+ai\b/i,
+    /\bai\s+is\s+taking\s+over\b/i,
+    /\bai\s+revolution\b/i,
+    /\bai\s+ethics\b/i,
+    /\bai\s+safety\b/i,
+    /\bai\s+research\b/i,
+    /\bneural\s+network\b/i,
+    /\bdeep\s+learning\b/i,
+    /\bllm\b/i,
+    /\bchatgpt\b/i,
+];
+
 /**
  * Check if text matches SEO spam patterns
  * @param {string} text - Text to check (should be lowercased)
@@ -60,4 +114,31 @@ export function isSeoSpamLight(text) {
  */
 export function hasHumanIntent(text) {
     return HUMAN_INTENT_PATTERNS.some(r => r.test(text));
+}
+
+/**
+ * Check if text matches marketplace/product listing patterns
+ * @param {string} text - Text to check
+ * @returns {boolean}
+ */
+export function isMarketplaceListing(text) {
+    return MARKETPLACE_PATTERNS.some(r => r.test(text));
+}
+
+/**
+ * Check if text is a personal story (non-B2B)
+ * @param {string} text - Text to check
+ * @returns {boolean}
+ */
+export function isPersonalStory(text) {
+    return PERSONAL_STORY_PATTERNS.some(r => r.test(text));
+}
+
+/**
+ * Check if text is a generic AI discussion without buying intent
+ * @param {string} text - Text to check
+ * @returns {boolean}
+ */
+export function isGenericAIDiscussion(text) {
+    return GENERIC_AI_PATTERNS.some(r => r.test(text));
 }

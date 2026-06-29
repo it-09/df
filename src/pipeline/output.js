@@ -136,6 +136,15 @@ export async function outputResults({
             continue;
         }
 
+        // FINAL SANITY CHECK: Reject signals with missing or generic whyHighIntent
+        // This catches edge cases where a signal slipped through without proper LLM validation
+        // Only enforce if whyHighIntent is defined (undefined means LLM was skipped, which is OK)
+        if (signal.whyHighIntent !== undefined && signal.whyHighIntent !== null && signal.whyHighIntent.length < 10) {
+            log.debug('SANITY_CHECK_REJECTED: Signal missing valid whyHighIntent explanation');
+            diagnostics.rejected.low_intent++;
+            continue;
+        }
+
         buyingSignals.push(signal);
         diagnostics.accepted++;
         diagnostics.sources[signal.source] = (diagnostics.sources[signal.source] || 0) + 1;

@@ -10,6 +10,7 @@ import { outputResults } from './pipeline/output.js';
 // Utilities
 import { enrichCompany } from './utils/enrichment.js';
 import { loadMonitorState } from './utils/monitor.js';
+import { buildTopicProfile } from './classifiers/topicProfile.js';
 
 await Actor.init();
 
@@ -106,11 +107,29 @@ if (resolvedSources.news && !newsApiKey) {
 
 const maxResults = Math.max(1, Math.min(100, maxRequestsPerCrawl));
 
+// Build topic profiles for each search query
+// Each company entry is treated as a search query/topic
+const topicProfiles = validCompanies.map(company => ({
+    company,
+    profile: buildTopicProfile(company),
+}));
+
 log.info('Starting Dark Funnel Intelligence Engine', {
     companies: validCompanies,
     sources: resolvedSources,
     maxResultsPerCompany: maxResults,
 });
+
+// Log topic profiles for debugging
+if (process.env.DEBUG_MODE === 'true') {
+    for (const { company, profile } of topicProfiles) {
+        log.info(`Topic profile for "${company}":`, {
+            primary: profile.primary,
+            relatedCount: profile.related.length,
+            commercialCount: profile.commercial.length,
+        });
+    }
+}
 
 await Actor.setStatusMessage(`Collecting signals from ${Object.values(resolvedSources).filter(Boolean).length} sources for ${validCompanies.length} companies...`);
 
@@ -153,14 +172,24 @@ try {
         process.exit(0);
     }
 
-    // STAGE 2: Classify Signals (Heuristics & Noise Rejection)
-    const classifiedSignals = classifySignals(allSignals, validCompanies, knownCompetitors, skipLanguageFilter);
+    // STAGE 2: Classify Signals (Topic Relevance → Negative Filter → Commercial Intent)
+    // Build a combined topic profile for classification
+    const combinedTopicProfile = {
+        primary: topicProfiles.flatMap(tp => tp.profile.primary),
+        related: topicProfiles.flatMap(tp => tp.profile.related),
+        commercial: topicProfiles[0]?.profile.commercial || [],
+        negative: topicProfiles[0]?.profile.negative || [],
+        originalQuery: validCompanies.join(', '),
+    };
+    const classifiedSignals = classifySignals(allSignals, validCompanies, knownCompetitors, combinedTopicProfile, skipLanguageFilter);
 
     // STAGE 3: Qualify Signals (LLM Truth Layer)
-    const qualifiedSignals = await qualifySignals(classifiedSignals, openaiApiKey, forensics);
+    // Pass the search query for LLM context
+    const searchQuery = validCompanies.join(', ');
+    const qualifiedSignals = await qualifySignals(classifiedSignals, openaiApiKey, searchQuery, forensics);
 
-    // STAGE 4: Enrich & Balance Signals (Outreach, ICP fit, Source balancing)
-    const enrichedFinalSignals = enrichSignals(qualifiedSignals, companyProfiles, seenHashes, monitoringMode, validCompanies);
+    // STAGE 4: Enrich & Quality Rank Signals (Outreach, ICP fit, No source quotas)
+    const enrichedFinalSignals = enrichSignals(qualifiedSignals, companyProfiles, seenHashes, monitoringMode, validCompanies, maxResults);
 
     // STAGE 5: Output Results (KPIs, aggregated summaries, KVS and dataset persistence)
     const { finalBuyingSignalCount, highIntentAlertsCount } = await outputResults({

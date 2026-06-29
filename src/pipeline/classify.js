@@ -1,4 +1,5 @@
 // Pipeline Stage 2: Heuristic Classification & Noise Rejection
+// New pipeline order: Topic Relevance → Negative Filter → Commercial Intent → Pain → Buying Intent
 import { log } from 'apify';
 import { franc, francAll } from 'franc-min';
 import { analyzeAspectSentiment } from '../classifiers/sentiment.js';
@@ -8,61 +9,122 @@ import { detectPainSignals } from '../classifiers/pain.js';
 import { detectSwitchingSignals } from '../classifiers/switching.js';
 import { calculateIntentScore, calculateLeadPriority } from '../classifiers/leadScorer.js';
 import { calculateCommercialRelevance } from '../classifiers/relevance.js';
+import { checkTopicRelevance } from '../classifiers/topicRelevance.js';
+import { filterNegatives } from '../classifiers/negativeFilter.js';
 import { deduplicateSignals, calculateConfidence, cleanText } from '../utils/normalizer.js';
 
 /**
+ * Helper to create a rejected signal object with consistent fields.
+ */
+function createRejectedSignal(signal, reason) {
+    return {
+        ...signal,
+        rejectionReason: reason,
+        signalQuality: 'REJECT',
+        sentiment: null,
+        buyingSignals: null,
+        competitorSignals: null,
+        personaSignals: null,
+        buyingStage: null,
+        confidence: 0,
+        painSignals: null,
+        switchSignals: null,
+        intentScore: 0,
+        intentLevel: null,
+        leadPriority: 'LOW',
+        commercialRelevanceScore: 0,
+        commercialRelevanceLevel: 'LOW',
+    };
+}
+
+/**
  * Deduplicate and heuristically classify collected signals.
- * Filters out noise and ranks remaining candidate signals.
- * 
+ * Pipeline order: Topic Relevance → Negative Filter → Commercial Intent → Pain → Buying Intent
+ *
  * @param {Array} allSignals - Raw signals collected
  * @param {string[]} validCompanies - Target companies list
  * @param {string[]} knownCompetitors - Known competitor names list
+ * @param {Object} topicProfile - Dynamic topic profile from buildTopicProfile()
+ * @param {boolean} skipLanguageFilter - Skip language detection
  * @returns {Array} - Heuristically classified signals
  */
-export function classifySignals(allSignals, validCompanies, knownCompetitors, skipLanguageFilter = false) {
+export function classifySignals(allSignals, validCompanies, knownCompetitors, topicProfile, skipLanguageFilter = false) {
     // Deduplicate signals
     const uniqueSignals = deduplicateSignals(allSignals);
     log.info(`After deduplication: ${uniqueSignals.length} signals`);
 
-    log.info('Running Stage 1 & 2 Heuristic Filtering...');
-    return uniqueSignals.map(signal => {
-        // Language detection step
-        if (!skipLanguageFilter) {
-            const fullText = cleanText(`${signal.title || ''} ${signal.content || ''}`);
-            // Get langauge with confidence - use francAll
-            const allLanguages = francAll(fullText, { minLength: 10 });
-            const topLang = allLanguages[0]; // top result has highest confidence
-            // Check if top language is not 'eng' with confidence > 0.7
-            if (topLang && topLang[0] !== 'eng' && topLang[1] > 0.7) {
-                return {
-                    ...signal,
-                    rejectionReason: 'non_english_content',
-                    signalQuality: 'REJECT',
-                    sentiment: null,
-                    buyingSignals: null,
-                    competitorSignals: null,
-                    personaSignals: null,
-                    buyingStage: null,
-                    confidence: 0,
-                    painSignals: null,
-                    switchSignals: null,
-                    intentScore: 0,
-                    intentLevel: null,
-                    leadPriority: 'LOW',
-                    commercialRelevanceScore: 0,
-                    commercialRelevanceLevel: 'LOW'
-                };
+    let topicRejected = 0;
+    let negativeRejected = 0;
+    let intentRejected = 0;
+    let languageRejected = 0;
+    let noiseRejected = 0;
+
+    log.info('Running Stage 2 Heuristic Filtering (Topic → Negative → Commercial Intent)...');
+    const classified = uniqueSignals.map(signal => {
+        // --- STAGE 1: Topic Relevance Gate ---
+        // Must be about the searched topic
+        if (topicProfile) {
+            const topicResult = checkTopicRelevance(signal, topicProfile);
+            if (!topicResult.isTopicRelevant) {
+                topicRejected++;
+                return createRejectedSignal(signal, topicResult.rejectionReason);
             }
         }
+
+        // --- STAGE 2: Negative Content Filter ---
+        // Reject marketplaces, personal stories, memes, generic AI, academic, etc.
+        const negativeResult = filterNegatives(signal);
+        if (negativeResult.isFiltered) {
+            negativeRejected++;
+            return createRejectedSignal(signal, negativeResult.filterReason);
+        }
+
+        // --- STAGE 3: Language Detection ---
+        if (!skipLanguageFilter) {
+            const fullText = cleanText(`${signal.title || ''} ${signal.content || ''}`);
+            const allLanguages = francAll(fullText, { minLength: 10 });
+            const topLang = allLanguages[0];
+            if (topLang && topLang[0] !== 'eng' && topLang[1] > 0.7) {
+                languageRejected++;
+                return createRejectedSignal(signal, 'non_english_content');
+            }
+        }
+
         const fullText = `${signal.title || ''} ${signal.content || ''}`;
         const cleanedText = cleanText(fullText);
 
         const signalDate = signal.createdAt ? new Date(signal.createdAt) : new Date();
         const daysOld = Math.max(0, Math.floor((new Date() - signalDate) / (1000 * 60 * 60 * 24)));
-        const noiseData = detectNoise(cleanedText);
 
-        const sentiment = analyzeAspectSentiment(cleanedText, signal.company, knownCompetitors);
+        // --- STAGE 4: Noise Detection ---
+        const noiseData = detectNoise(cleanedText);
+        if (noiseData.isNoise) {
+            noiseRejected++;
+            return createRejectedSignal(signal, noiseData.reason);
+        }
+
+        // --- STAGE 5: Commercial Intent Classification ---
         const buyingSignals = detectBuyingSignals(cleanedText);
+        const hasCommercialIntent =
+            buyingSignals.hasFrustrationSignal ||
+            buyingSignals.hasEvaluationSignal ||
+            buyingSignals.hasBudgetSignal ||
+            buyingSignals.hasDecisionSignal ||
+            buyingSignals.hasTechnicalSignal;
+
+        if (!hasCommercialIntent) {
+            intentRejected++;
+            return createRejectedSignal(signal, 'Generic mention lacking commercial or pain indicators');
+        }
+
+        // --- STAGE 6: Staleness Filter ---
+        if (daysOld > 90 && !buyingSignals.hasFrustrationSignal && !buyingSignals.hasEvaluationSignal) {
+            intentRejected++;
+            return createRejectedSignal(signal, `Content is too old (${daysOld} days) and lacks explicit switching/evaluation intent`);
+        }
+
+        // --- STAGE 7: Full Classification ---
+        const sentiment = analyzeAspectSentiment(cleanedText, signal.company, knownCompetitors);
         const competitorSignals = detectCompetitors(cleanedText, knownCompetitors);
         const personaSignals = extractPersona(cleanedText);
         const buyingStage = predictBuyingStage(buyingSignals, sentiment);
@@ -77,28 +139,8 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, sk
             buyingSignals, sentiment, personaSignals, painSignals, switchSignals, buyingStage, competitorSignals
         }, signal.source, signal.subreddit || signal.sourceCategory, daysOld, noiseData.isNoise, signal.repoStars || 0);
 
-        let rejectionReason = '';
-        const hasCommercialPainOrIntent = 
-            buyingSignals.hasFrustrationSignal || 
-            buyingSignals.hasEvaluationSignal || 
-            switchSignals.switchingDetected || 
-            buyingSignals.hasBudgetSignal || 
-            buyingSignals.hasTechnicalSignal || 
-            buyingSignals.hasDecisionSignal || 
-            competitorSignals.hasCompetitiveSignal;
-
-        if (noiseData.isNoise) {
-            rejectionReason = noiseData.reason;
-        } else if (!hasCommercialPainOrIntent) {
-            rejectionReason = `Generic mention lacking commercial or pain indicators`;
-        } else if (daysOld > 90 && !switchSignals.switchingDetected && !buyingSignals.hasFrustrationSignal && !buyingSignals.hasEvaluationSignal) {
-            rejectionReason = `Content is too old (${daysOld} days) and lacks explicit switching/evaluation intent`;
-        }
-
+        // --- STAGE 8: Quality Assignment ---
         let signalQuality = intentScore >= 60 ? 'HIGH' : (intentScore >= 30 ? 'MEDIUM' : 'LOW');
-        if (rejectionReason) {
-            signalQuality = 'REJECT';
-        }
 
         const leadPriority = calculateLeadPriority({
             intentScore, painSignals, switchSignals, personaSignals, buyingSignals, competitorSignals, buyingStage, commercialRelevanceLevel
@@ -106,12 +148,12 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, sk
 
         return {
             ...signal,
-            rejectionReason,
+            rejectionReason: '',
             signalQuality,
             sentiment: { score: sentiment.overall.score, label: sentiment.overall.label, towardCompany: sentiment.towardCompany, towardCompetitors: sentiment.towardCompetitors },
-            buyingSignals: { hasBudgetSignal: buyingSignals.hasBudgetSignal, hasTimelineSignal: buyingSignals.hasTimelineSignal, hasTechnicalSignal: buyingSignals.hasTechnicalSignal, hasEvaluationSignal: buyingSignals.hasEvaluationSignal, hasDecisionSignal: buyingSignals.hasDecisionSignal, confidence: buyingSignals.confidence, signals: buyingSignals.signals },
+            buyingSignals: { hasBudgetSignal: buyingSignals.hasBudgetSignal, hasTimelineSignal: buyingSignals.hasTimelineSignal, hasTechnicalSignal: buyingSignals.hasTechnicalSignal, hasEvaluationSignal: buyingSignals.hasEvaluationSignal, hasDecisionSignal: buyingSignals.hasDecisionSignal, hasFrustrationSignal: buyingSignals.hasFrustrationSignal, confidence: buyingSignals.confidence, signals: buyingSignals.signals },
             competitorSignals: { hasCompetitiveSignal: competitorSignals.hasCompetitiveSignal, competitors: competitorSignals.competitors },
-            personaSignals: { jobTitles: personaSignals.jobTitles, departments: personaSignals.departments, seniorityLevels: personaSignals.seniorityLevels, isDecisionMaker: isDecisionMaker(personaSignals), influenceScore: scorePersonaInfluence(personaSignals) },
+            personaSignals: { jobTitles: personaSignals.jobTitles, departments: personaSignals.departments, seniorityLevels: personaSignals.senityLevels, isDecisionMaker: isDecisionMaker(personaSignals), influenceScore: scorePersonaInfluence(personaSignals) },
             buyingStage,
             confidence: calculateConfidence(signal),
             painSignals: { hasPainSignal: painSignals.hasPainSignal, painTypes: painSignals.painTypes, severity: painSignals.severity, confidence: painSignals.confidence, compoundComboMatched: painSignals.compoundComboMatched },
@@ -124,4 +166,9 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, sk
             painComboBoost
         };
     });
+
+    // Log filtering statistics
+    log.info(`Stage 2 filtering summary: topic_rejected=${topicRejected}, negative_rejected=${negativeRejected}, language_rejected=${languageRejected}, noise_rejected=${noiseRejected}, intent_rejected=${intentRejected}`);
+
+    return classified;
 }
