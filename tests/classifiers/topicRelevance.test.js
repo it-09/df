@@ -54,13 +54,14 @@ describe('topicRelevance', () => {
             expect(result.isTopicRelevant).toBe(false);
         });
 
-        it('should reject very short content with minimal keyword match', () => {
+        it('should give low score for very short content with minimal keyword match', () => {
             const signal = {
                 title: 'AI',
                 content: 'Cool.',
             };
             const result = checkTopicRelevance(signal, aiReceptionistProfile);
-            expect(result.isTopicRelevant).toBe(false);
+            // With soft signal approach, short content still gets a low score but is not hard-rejected
+            expect(result.topicScore).toBeLessThan(0.4);
         });
 
         it('should give higher score for title + content match', () => {

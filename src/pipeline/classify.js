@@ -61,14 +61,15 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, to
 
     log.info('Running Stage 2 Heuristic Filtering (Topic → Negative → Commercial Intent)...');
     const classified = uniqueSignals.map(signal => {
-        // --- STAGE 1: Topic Relevance Gate ---
-        // Must be about the searched topic
+        // --- STAGE 1: Topic Relevance (SOFT SIGNAL) ---
+        // Topic relevance is used to boost score, not as a hard gate.
+        // The negative filter and commercial intent do the real filtering.
+        let topicScore = 0;
+        let matchedTopicTerms = [];
         if (topicProfile) {
             const topicResult = checkTopicRelevance(signal, topicProfile);
-            if (!topicResult.isTopicRelevant) {
-                topicRejected++;
-                return createRejectedSignal(signal, topicResult.rejectionReason);
-            }
+            topicScore = topicResult.topicScore;
+            matchedTopicTerms = topicResult.matchedTerms;
         }
 
         // --- STAGE 2: Negative Content Filter ---
@@ -135,9 +136,13 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, to
             cleanedText, signal.title, signal.author, { buyingSignals, painSignals, switchSignals, buyingStage }
         );
 
-        const { intentScore, intentLevel, painComboBoost } = calculateIntentScore({
+        const { intentScore: baseIntentScore, intentLevel, painComboBoost } = calculateIntentScore({
             buyingSignals, sentiment, personaSignals, painSignals, switchSignals, buyingStage, competitorSignals
         }, signal.source, signal.subreddit || signal.sourceCategory, daysOld, noiseData.isNoise, signal.repoStars || 0);
+
+        // Boost intent score for topic-relevant signals (soft signal, not a gate)
+        const topicBoost = Math.round(topicScore * 15); // Max +15 points for perfect topic match
+        const intentScore = Math.min(100, baseIntentScore + topicBoost);
 
         // --- STAGE 8: Quality Assignment ---
         let signalQuality = intentScore >= 60 ? 'HIGH' : (intentScore >= 30 ? 'MEDIUM' : 'LOW');
@@ -163,7 +168,8 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, to
             leadPriority,
             commercialRelevanceScore,
             commercialRelevanceLevel,
-            painComboBoost
+            painComboBoost,
+            topicRelevance: { score: topicScore, matchedTerms: matchedTopicTerms }
         };
     });
 

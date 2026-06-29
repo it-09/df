@@ -8,7 +8,8 @@ export const MIN_CONFIDENCE_THRESHOLD = 0.75;
 
 // Minimum topic relevance score (0.0 - 1.0)
 // Signals below this are rejected as not about the searched topic
-export const MIN_TOPIC_RELEVANCE_SCORE = 0.4;
+// 0.1 allows related tool mentions (e.g., "Pipedrive" for CRM query) to pass
+export const MIN_TOPIC_RELEVANCE_SCORE = 0.1;
 
 // Maximum results per query
 export const MAX_RESULTS_PER_QUERY = 50;
