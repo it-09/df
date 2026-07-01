@@ -73,7 +73,9 @@ export async function scrapeGitHub(companies, maxResults = 10) {
                             "changelog", "breaking change", "deprecat",
                             "unit test", "integration test", "ci pipeline",
                             "dockerfile", "kubernetes", "helm chart",
-                            "implement", "add support for", "feature request"
+                            "implement", "add support for", "feature request",
+                            "weekly discovery", "new tools found", "awesome list",
+                            "curated list", "tools found", "roundup"
                         ];
 
                         const hasCommercialIntent = mustContainOneOf.some(phrase => fullText.includes(phrase));

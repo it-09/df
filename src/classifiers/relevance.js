@@ -1,8 +1,8 @@
 export function calculateCommercialRelevance(text, title, author, signals) {
     const lowerText = (text || '').toLowerCase();
     
-    // Auto-reject known garbage
-    if (lowerText.includes('bot') || lowerText.includes('changelog') || lowerText.includes('release notes') || lowerText.includes('ci/cd')) {
+    // Auto-reject known garbage (word-boundary match to avoid false positives like "robot", "both")
+    if (/\bbot\b|\bchangelog\b|\brelease notes\b|\bci\/cd\b/i.test(lowerText)) {
         return { commercialRelevanceScore: 0, commercialRelevanceLevel: 'LOW' };
     }
 

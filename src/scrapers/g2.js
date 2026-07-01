@@ -4,6 +4,29 @@ import { parseOrEstimatePostDate } from '../utils/normalizer.js';
 import { isSeoSpamLight, hasHumanIntent } from '../utils/spamPatterns.js';
 
 /**
+ * Detect G2 listing/directory page boilerplate in search snippets.
+ * These are NOT individual reviews — they are G2's own navigation/filtering pages.
+ *
+ * @param {string} text - Combined title + snippet text (lowercased)
+ * @returns {boolean}
+ */
+export function isG2Boilerplate(text) {
+    const lower = text.toLowerCase();
+    const patterns = [
+        /explore\s+\w+'?s?\s+top\s+(pros|cons|features)/i,
+        /filter\s+\d{3,}\s+reviews?\s+by/i,
+        /\d{3,}\s+reviews?\s+by\s+(the\s+)?users/i,
+        /\bby\s+the\s+users'?/i,
+        /\beasily\s+filter/i,
+        /\bpros?\s+and\s+cons?\b.*\bby\b/i,
+        /\breviews?\s*\|\s*\w+/i,
+        /\w+\s+reviews?\s+20\d{2}/i,
+        /\w+\s*\|\s*\w+\s+reviews?\s+20\d{2}/i,
+    ];
+    return patterns.some(p => p.test(lower));
+}
+
+/**
  * Scrape G2 reviews using Yahoo/Bing Search Dorking.
  * Zero API keys required.
  * 
@@ -58,6 +81,11 @@ export async function scrapeG2(companies, maxResults = 10) {
                             diagFilteredSignals++;
                             continue;
                         }
+                        // Skip G2 listing/directory pages — individual reviews have a slug or ID
+                        if (urlPath.match(/\/products\/[^/]+\/reviews\/?(\?|#|$)/i)) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
                         // Must be about the actual company — reject generic G2 list pages
                         if (!urlPath.toLowerCase().includes(company.toLowerCase().replace(/\s+/g, '-')) &&
                             !fullText.includes(company.toLowerCase())) {
@@ -78,6 +106,12 @@ export async function scrapeG2(companies, maxResults = 10) {
                         // Primary gate: any dissatisfaction, evaluation or comparison signal
                         const hasDissatisfaction = /(pricing|expensive|too expensive|alternative|comparison|vs\b|versus|limitations|wish it had|missing feature|moving away|frustrated|support issues|dislike|canceling|cancelling|switching|slow|buggy|confusing|overpriced)/i.test(fullText);
                         if (!hasIntent && !hasDissatisfaction) {
+                            diagFilteredSignals++;
+                            continue;
+                        }
+
+                        // Reject G2 listing/directory page boilerplate (navigation, filters, meta-descriptions)
+                        if (isG2Boilerplate(fullText)) {
                             diagFilteredSignals++;
                             continue;
                         }

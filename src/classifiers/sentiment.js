@@ -1,5 +1,6 @@
 // Sentiment analysis module
 import Sentiment from 'sentiment';
+import { matchesCompany } from '../utils/normalizer.js';
 
 const sentiment = new Sentiment();
 
@@ -59,7 +60,9 @@ export function analyzeAspectSentiment(text, company, competitors = []) {
     };
 
     // Check if company is mentioned near positive/negative words
-    const companyPos = lowerText.indexOf(companyLower);
+    const companyPos = matchesCompany(lowerText, companyLower, text)
+        ? lowerText.search(new RegExp(`(?<![a-zA-Z])${companyLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-zA-Z])`, 'i'))
+        : -1;
     if (companyPos !== -1) {
         const context = lowerText.substring(Math.max(0, companyPos - 100), Math.min(lowerText.length, companyPos + 100));
         const contextSentiment = analyzeSentiment(context);
@@ -69,9 +72,9 @@ export function analyzeAspectSentiment(text, company, competitors = []) {
     // Check competitor mentions
     for (const competitor of competitors) {
         const competitorLower = competitor.toLowerCase();
-        if (lowerText.includes(competitorLower)) {
+        if (matchesCompany(lowerText, competitorLower, text)) {
             result.competitorMentions.push(competitor);
-            const compPos = lowerText.indexOf(competitorLower);
+            const compPos = lowerText.search(new RegExp(`(?<![a-zA-Z])${competitorLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-zA-Z])`, 'i'));
             const context = lowerText.substring(Math.max(0, compPos - 100), Math.min(lowerText.length, compPos + 100));
             const contextSentiment = analyzeSentiment(context);
             if (contextSentiment.score !== 0) {

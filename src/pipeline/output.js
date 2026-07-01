@@ -19,7 +19,8 @@ export async function outputResults({
     datasetId,
     consecutiveFailures,
     webhookUrl,
-    webhookBatchSize = 25
+    webhookBatchSize = 25,
+    llmEnabled = false
 }) {
     async function pushDataToApify(items, typeLabel = 'data') {
         const dataArray = Array.isArray(items) ? items : [items];
@@ -108,11 +109,11 @@ export async function outputResults({
         }
 
         // HIGH-INTENT FILTER: Only surface signals with genuine buyer intent.
-        // Require leadPriority HIGH or URGENT — this already factors in intentScore,
-        // so we don't need a separate score fallback (which was letting LOW-priority
-        // signals slip through when intentScore was inflated).
+        // With LLM: require leadPriority HIGH or URGENT (LLM validates quality).
+        // Without LLM: include MEDIUM signals too (heuristic-only fallback).
         const isHighIntent = signal.leadPriority === 'URGENT' ||
-            signal.leadPriority === 'HIGH';
+            signal.leadPriority === 'HIGH' ||
+            (!llmEnabled && signal.leadPriority === 'MEDIUM');
         if (!isHighIntent) {
             diagnostics.rejected.low_priority++;
             continue;
@@ -184,6 +185,11 @@ export async function outputResults({
 
     if (finalRows.length !== buyingSignals.length) {
         log.warning(`INVALID_SIGNAL_REJECTED: Dropped ${buyingSignals.length - finalRows.length} invalid signals just before dataset push.`);
+    }
+
+    log.debug(`OUTPUT_FILTER: ${buyingSignals.length} signals entered, ${finalRows.length} passed schema enforcement`);
+    for (const s of buyingSignals) {
+        log.debug(`  ${s.leadPriority}/${s.intentScore} ${s.source}/${s.company} "${(s.title||'').substring(0,50)}"`);
     }
 
     // Sort by recency: most recent signals first so users see the freshest intelligence at top.

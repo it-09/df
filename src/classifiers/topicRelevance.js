@@ -3,6 +3,7 @@
 // not just a passing mention or unrelated content.
 
 import { MIN_TOPIC_RELEVANCE_SCORE } from '../constants.js';
+import { matchesCompany } from '../utils/normalizer.js';
 
 /**
  * Check if a signal is relevant to the searched topic.
@@ -25,14 +26,16 @@ export function checkTopicRelevance(signal, topicProfile) {
     const title = (signal.title || '').toLowerCase();
     const content = (signal.content || '').toLowerCase();
     const fullText = `${title} ${content}`;
+    const originalTitle = signal.title || '';
+    const originalContent = signal.content || '';
 
     const matchedTerms = [];
     let score = 0;
 
     // 1. Check primary keywords (highest weight)
     for (const term of topicProfile.primary) {
-        const inTitle = title.includes(term);
-        const inContent = content.includes(term);
+        const inTitle = matchesCompany(title, term, originalTitle);
+        const inContent = matchesCompany(content, term, originalContent);
 
         if (inTitle && inContent) {
             matchedTerms.push(term);
@@ -48,7 +51,7 @@ export function checkTopicRelevance(signal, topicProfile) {
 
     // 2. Check related keywords (moderate weight)
     for (const term of topicProfile.related) {
-        if (fullText.includes(term)) {
+        if (matchesCompany(fullText, term, `${originalTitle} ${originalContent}`)) {
             matchedTerms.push(term);
             score += 0.15;
         }
@@ -61,7 +64,7 @@ export function checkTopicRelevance(signal, topicProfile) {
     }
 
     // 4. Check if title contains the query (strong signal)
-    if (title.includes(topicProfile.originalQuery)) {
+    if (matchesCompany(title, topicProfile.originalQuery, originalTitle)) {
         score += 0.15;
     }
 

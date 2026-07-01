@@ -38,6 +38,46 @@ function createRejectedSignal(signal, reason) {
 }
 
 /**
+ * Build a stable identifier for cross-company deduplication.
+ * Priority: URL > GitHub repo > HN item ID > Reddit post ID > null
+ * @param {Object} signal - The signal to identify
+ * @returns {string|null} - Stable identifier or null
+ */
+function buildStableIdentifier(signal) {
+    // 1. Canonical URL (most reliable)
+    if (signal.url) {
+        try {
+            const urlObj = new URL(signal.url);
+            urlObj.search = '';
+            urlObj.hash = '';
+            return `url:${urlObj.toString().toLowerCase().replace(/\/$/, '')}`;
+        } catch {
+            // Invalid URL, fall through
+        }
+    }
+
+    // 2. GitHub repository (owner/repo)
+    if (signal.source === 'github' && signal.repository) {
+        return `github:${signal.repository.toLowerCase()}`;
+    }
+
+    // 3. HN item ID
+    if (signal.source === 'hackernews' && signal.url) {
+        const hnMatch = signal.url.match(/item\?id=(\d+)/);
+        if (hnMatch) return `hn:${hnMatch[1]}`;
+    }
+
+    // 4. Reddit post ID
+    if (signal.source === 'reddit' && signal.url) {
+        const redditMatch = signal.url.match(/\/comments\/([a-z0-9]+)/i);
+        if (redditMatch) return `reddit:${redditMatch[1]}`;
+    }
+
+    // No stable identifier — allow through (content dedup handles this)
+    return null;
+}
+
+/**
  * Deduplicate and heuristically classify collected signals.
  * Pipeline order: Topic Relevance → Negative Filter → Commercial Intent → Pain → Buying Intent
  *
@@ -49,9 +89,26 @@ function createRejectedSignal(signal, reason) {
  * @returns {Array} - Heuristically classified signals
  */
 export function classifySignals(allSignals, validCompanies, knownCompetitors, topicProfile, skipLanguageFilter = false) {
-    // Deduplicate signals
+    // Deduplicate signals (content fingerprint)
     const uniqueSignals = deduplicateSignals(allSignals);
     log.info(`After deduplication: ${uniqueSignals.length} signals`);
+
+    // Cross-company deduplication (stable identifiers)
+    const seenIdentifiers = new Map();
+    const crossCompanyDeduped = [];
+    for (const signal of uniqueSignals) {
+        const identifier = buildStableIdentifier(signal);
+        if (identifier) {
+            const existingCompany = seenIdentifiers.get(identifier);
+            if (existingCompany && existingCompany !== signal.company) {
+                log.debug(`CROSS_COMPANY_DEDUP: "${(signal.title || '').substring(0, 50)}" already seen for ${existingCompany}, skipping for ${signal.company}`);
+                continue;
+            }
+            seenIdentifiers.set(identifier, signal.company);
+        }
+        crossCompanyDeduped.push(signal);
+    }
+    log.info(`After cross-company deduplication: ${crossCompanyDeduped.length} signals (removed ${uniqueSignals.length - crossCompanyDeduped.length})`);
 
     let topicRejected = 0;
     let negativeRejected = 0;
@@ -60,7 +117,7 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, to
     let noiseRejected = 0;
 
     log.info('Running Stage 2 Heuristic Filtering (Topic → Negative → Commercial Intent)...');
-    const classified = uniqueSignals.map(signal => {
+    const classified = crossCompanyDeduped.map(signal => {
         // --- STAGE 1: Topic Relevance (SOFT SIGNAL) ---
         // Topic relevance is used to boost score, not as a hard gate.
         // The negative filter and commercial intent do the real filtering.
@@ -130,7 +187,7 @@ export function classifySignals(allSignals, validCompanies, knownCompetitors, to
         const personaSignals = extractPersona(cleanedText);
         const buyingStage = predictBuyingStage(buyingSignals, sentiment);
         const painSignals = detectPainSignals(cleanedText);
-        const switchSignals = detectSwitchingSignals(cleanedText, validCompanies, knownCompetitors);
+        const switchSignals = detectSwitchingSignals(cleanedText, validCompanies, knownCompetitors, fullText);
 
         const { commercialRelevanceScore, commercialRelevanceLevel } = calculateCommercialRelevance(
             cleanedText, signal.title, signal.author, { buyingSignals, painSignals, switchSignals, buyingStage }

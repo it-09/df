@@ -1,4 +1,5 @@
 // Intent and buying signal classifier
+import { matchesCompany } from '../utils/normalizer.js';
 
 // Keyword patterns for different buying signals
 const BUDGET_KEYWORDS = [
@@ -180,7 +181,7 @@ export function detectCompetitors(text, knownCompetitors = []) {
     const mentioned = [];
 
     for (const competitor of knownCompetitors) {
-        if (lowerText.includes(competitor.toLowerCase())) {
+        if (matchesCompany(lowerText, competitor.toLowerCase(), text)) {
             mentioned.push(competitor);
         }
     }

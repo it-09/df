@@ -1,7 +1,72 @@
 import { describe, it, expect } from 'vitest';
-import { fuzzyMatchCompany, cleanText, simpleHash, deduplicateSignals, calculateConfidence, parseSnippetDate, estimateRedditPostDate, estimateLinkedInPostDate, estimateG2ReviewDate, parseOrEstimatePostDate } from '../../src/utils/normalizer.js';
+import { matchesCompany, fuzzyMatchCompany, cleanText, simpleHash, deduplicateSignals, calculateConfidence, parseSnippetDate, estimateRedditPostDate, estimateLinkedInPostDate, estimateG2ReviewDate, parseOrEstimatePostDate } from '../../src/utils/normalizer.js';
 
 describe('normalizer utility', () => {
+    describe('matchesCompany', () => {
+        it('should match exact company name as whole word', () => {
+            expect(matchesCompany('we use Stripe for payments', 'Stripe')).toBe(true);
+        });
+
+        it('should NOT match substring (stripes ≠ Stripe)', () => {
+            expect(matchesCompany('CSS stripes pattern', 'Stripe')).toBe(false);
+        });
+
+        it('should NOT match partial word (systemd ≠ Freshdesk)', () => {
+            expect(matchesCompany('systemd replacement', 'Freshdesk')).toBe(false);
+        });
+
+        it('should match company at start of text', () => {
+            expect(matchesCompany('Notion is great', 'Notion')).toBe(true);
+        });
+
+        it('should match company at end of text', () => {
+            expect(matchesCompany('I love HubSpot', 'HubSpot')).toBe(true);
+        });
+
+        it('should match company surrounded by spaces', () => {
+            expect(matchesCompany('use Salesforce daily', 'Salesforce')).toBe(true);
+        });
+
+        it('should match company after punctuation', () => {
+            expect(matchesCompany('tried,Stripe,worked', 'Stripe')).toBe(true);
+        });
+
+        it('should handle company names with special chars', () => {
+            expect(matchesCompany('using C++ for project', 'C++')).toBe(true);
+        });
+
+        it('should return false for empty text', () => {
+            expect(matchesCompany('', 'Stripe')).toBe(false);
+        });
+
+        it('should return false for empty company name', () => {
+            expect(matchesCompany('some text', '')).toBe(false);
+        });
+
+        it('should require capitalization for ambiguous words like "notion" when originalText provided', () => {
+            // Without originalText — falls through to normal matching
+            expect(matchesCompany('pushing back on the notion that digital means all', 'notion')).toBe(true);
+            // With originalText and lowercase "notion" — should NOT match
+            expect(matchesCompany('pushing back on the notion that digital means all', 'notion', 'pushing back on the notion that digital means all')).toBe(false);
+            // With originalText and capitalized "Notion" — should match
+            expect(matchesCompany('pushing back on the Notion that digital means all', 'notion', 'pushing back on the Notion that digital means all')).toBe(true);
+        });
+
+        it('should require capitalization for "stripe" when originalText provided', () => {
+            // Without originalText — falls through to normal matching
+            expect(matchesCompany('the cat has a stripe', 'stripe')).toBe(true);
+            // With originalText and lowercase "stripe" — should NOT match
+            expect(matchesCompany('the cat has a stripe', 'stripe', 'the cat has a stripe')).toBe(false);
+            // With originalText and capitalized "Stripe" — should match
+            expect(matchesCompany('the cat has a Stripe', 'stripe', 'the cat has a Stripe')).toBe(true);
+        });
+
+        it('should NOT require capitalization for non-ambiguous companies', () => {
+            // HubSpot is not ambiguous — lowercase should match
+            expect(matchesCompany('we use hubspot daily', 'hubspot')).toBe(true);
+        });
+    });
+
     describe('fuzzyMatchCompany', () => {
         it('should perform exact match', () => {
             expect(fuzzyMatchCompany('hubspot', ['HubSpot', 'Salesforce'])).toBe('HubSpot');

@@ -204,7 +204,8 @@ try {
         datasetId,
         consecutiveFailures: updatedConsecutiveFailures,
         webhookUrl,
-        webhookBatchSize
+        webhookBatchSize,
+        llmEnabled: !!openaiApiKey
     });
 
     await Actor.setStatusMessage(`Complete: ${finalBuyingSignalCount} signals, ${highIntentAlertsCount} high-intent leads found.`, { isStatusMessageTerminal: true });

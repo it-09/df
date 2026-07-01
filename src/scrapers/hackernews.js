@@ -2,6 +2,7 @@
 import { log } from 'apify';
 import { axiosWithRetry } from '../utils/http.js';
 import { isSeoSpamLight, hasHumanIntent } from '../utils/spamPatterns.js';
+import { isLikelySelfPromotion } from '../utils/signalQuality.js';
 
 /**
  * Strip HTML tags from text (HN Algolia returns raw HTML)
@@ -54,6 +55,14 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                             continue;
                         }
 
+                        // REJECT: Show HN self-promotion (founder showcasing their own product)
+                        // Only reject if no genuine buyer language in the discussion
+                        if (isLikelySelfPromotion({ ...hit, source: 'hackernews', title, content })) {
+                            diagFilteredSignals++;
+                            log.debug(`HN_SELF_PROMO_REJECTED: ${title}`);
+                            continue;
+                        }
+
                         // LIGHT spam gate for HN (avoids killing comparison/review content)
                         if (isSeoSpamLight(fullText) && !hasHumanIntent(fullText)) {
                             diagSpamRejected++;
@@ -103,6 +112,13 @@ export async function scrapeHackerNews(companies, maxResults = 10) {
                         const hasNoise = /(stack trace|ci\/cd|deployment pipeline|bug report|refactor sprint|internal infrastructure)/i.test(fullText);
                         if (hasNoise) {
                             diagFilteredSignals++;
+                            continue;
+                        }
+
+                        // REJECT: Show HN self-promotion in comments
+                        if (isLikelySelfPromotion({ ...hit, source: 'hackernews', title, content })) {
+                            diagFilteredSignals++;
+                            log.debug(`HN_SELF_PROMO_REJECTED: ${title}`);
                             continue;
                         }
 

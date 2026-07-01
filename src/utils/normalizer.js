@@ -2,6 +2,52 @@
 import crypto from 'crypto';
 
 /**
+ * Common English words that are also company names.
+ * When these appear as lowercase in text, they're likely the common word,
+ * not the company. Require capitalized form for a match.
+ */
+const AMBIGUOUS_COMPANY_WORDS = new Set([
+    'notion', // "notion" (idea) vs "Notion" (app)
+    'stripe', // "stripe" (pattern) vs "Stripe" (payments)
+    'docker', // "docker" (container ship) vs "Docker" (containers)
+    'asana', // "asana" (yoga pose) vs "Asana" (PM tool)
+    'zendesk', // less ambiguous but keep for safety
+    'freshdesk', // less ambiguous but keep for safety
+    'monday', // "monday" (day) vs "Monday.com"
+    'clickup', // less ambiguous
+    'intercom', // less ambiguous
+    'airtable', // less ambiguous
+    'github', // less ambiguous
+    'gitlab', // less ambiguous
+]);
+
+/**
+ * Check if text contains the company name as a whole word (not substring).
+ * Uses lookaround assertions for word boundaries — works with alphabetic
+ * company names and handles edge cases better than \b (e.g., names with periods).
+ * For ambiguous names (e.g., "notion"), requires capitalized form in original text.
+ * @param {string} text - Text to search (lowercased)
+ * @param {string} companyName - Company name to find (lowercased)
+ * @param {string} [originalText] - Original un-lowercased text (for capitalization check)
+ * @returns {boolean}
+ */
+export function matchesCompany(text, companyName, originalText) {
+    if (!text || !companyName) return false;
+    const escaped = companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(?<![a-zA-Z])${escaped}(?![a-zA-Z])`, 'i');
+
+    // For ambiguous words that are also common English words,
+    // require the capitalized form in original text (if available)
+    if (AMBIGUOUS_COMPANY_WORDS.has(companyName.toLowerCase()) && originalText) {
+        const capitalized = companyName.charAt(0).toUpperCase() + companyName.slice(1).toLowerCase();
+        const capitalizedPattern = new RegExp(`(?<![a-zA-Z])${capitalized}(?![a-zA-Z])`);
+        return capitalizedPattern.test(originalText);
+    }
+
+    return pattern.test(text);
+}
+
+/**
  * Fuzzy match company names
  * @param {string} mention - Company mention from text
  * @param {string[]} companies - Known company names
@@ -19,10 +65,10 @@ export function fuzzyMatchCompany(mention, companies) {
         }
     }
 
-    // Partial match (company name contains mention or vice versa)
+    // Word-boundary match (prevents "stripes" matching "Stripe")
     for (const company of companies) {
         const companyLower = company.toLowerCase();
-        if (mentionLower.includes(companyLower) || companyLower.includes(mentionLower)) {
+        if (matchesCompany(mentionLower, companyLower, mention) || matchesCompany(companyLower, mentionLower, company)) {
             return company;
         }
     }
