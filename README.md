@@ -44,46 +44,46 @@ The engine uses a modular, 5-layer pipeline architecture designed for high throu
 
 ```mermaid
 flowchart TD
-    subgraph Data Sources ["1. Multi-Source Scraping Layer"]
-        A1[Reddit B2B]
-        A2[G2 Reviews]
-        A3[LinkedIn Discovery]
-        A4[Hacker News]
-        A5[GitHub Issues]
-        A6[News API]
+    subgraph DS ["1. Multi-Source Scraping Layer"]
+        A1["Reddit B2B"]
+        A2["G2 Reviews"]
+        A3["LinkedIn Discovery"]
+        A4["Hacker News"]
+        A5["GitHub Issues"]
+        A6["News API"]
     end
 
-    subgraph Preprocessing ["2. Zero-Cost Noise Rejection"]
-        B1[HTML Entity Decoding & Normalization]
-        B2[Content Fingerprinting & Deduplication]
-        B3[Negative Filter: Listicles / SEO / Bug Ads]
-        B4[Topic Relevance Thresholding]
+    subgraph PRE ["2. Zero-Cost Noise Rejection"]
+        B1["HTML Entity Decoding & Normalization"]
+        B2["Content Fingerprinting & Deduplication"]
+        B3["Negative Filter: Listicles / SEO / Bug Ads"]
+        B4["Topic Relevance Thresholding"]
     end
 
-    subgraph Classifiers ["3. Multidimensional NLP Engine"]
-        C1[Intent Detector<br/>Budget / Timeline / Evaluation]
-        C2[Switching Detector<br/>Competitor Migration]
-        C3[Persona NER<br/>C-Suite / VP / Director]
-        C4[Compound Pain Engine<br/>Pricing + Vendor Lock]
-        C5[Sentiment Classifier<br/>AFINN Lexicon]
+    subgraph CLS ["3. Multidimensional NLP Engine"]
+        C1["Intent Detector<br/>Budget / Timeline / Evaluation"]
+        C2["Switching Detector<br/>Competitor Migration"]
+        C3["Persona NER<br/>C-Suite / VP / Director"]
+        C4["Compound Pain Engine<br/>Pricing + Vendor Lock"]
+        C5["Sentiment Classifier<br/>AFINN Lexicon"]
     end
 
-    subgraph Scoring ["4. Lead Qualification & Scoring"]
-        D1[Source Multipliers<br/>r/revops 1.5x / G2 1.5x]
-        D2[Recency Exponential Decay]
-        D3[Lead Priority Matrix<br/>URGENT / HIGH / MEDIUM]
+    subgraph SCR ["4. Lead Qualification & Scoring"]
+        D1["Source Multipliers<br/>r/revops 1.5x / G2 1.5x"]
+        D2["Recency Exponential Decay"]
+        D3["Lead Priority Matrix<br/>URGENT / HIGH / MEDIUM"]
     end
 
-    subgraph Sinks ["5. Output & Delivery Layer"]
-        E1[Apify Datasets]
-        E2[Webhook Batch Dispatcher]
-        E3[Executive Summaries & Alerts]
+    subgraph SNK ["5. Output & Delivery Layer"]
+        E1["Apify Datasets"]
+        E2["Webhook Batch Dispatcher"]
+        E3["Executive Summaries & Alerts"]
     end
 
-    Data Sources --> Preprocessing
-    Preprocessing -->|Accepted Signals| Classifiers
-    Classifiers --> Scoring
-    Scoring --> Sinks
+    DS --> PRE
+    PRE -->|Accepted Signals| CLS
+    CLS --> SCR
+    SCR --> SNK
 ```
 
 ### 🧩 Core Architecture Components
