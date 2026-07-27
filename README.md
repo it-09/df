@@ -38,27 +38,91 @@ It monitors high-value B2B discussions across Reddit, G2, Hacker News, and GitHu
 
 ---
 
-## 🚀 How It Works: The Hybrid Intelligence Engine
+## 🏗️ System Architecture & Data Flow
 
-Our engine avoids the fatal flaw of most scrapers: *noise*. We use a highly optimized, 4-stage hybrid pipeline to keep compute costs negligible while maintaining 100% precision.
+The engine uses a modular, 5-layer pipeline architecture designed for high throughput, low latency, and zero-cost noise rejection.
+
+```mermaid
+flowchart TD
+    subgraph Data Sources ["1. Multi-Source Scraping Layer"]
+        A1[Reddit B2B]
+        A2[G2 Reviews]
+        A3[LinkedIn Discovery]
+        A4[Hacker News]
+        A5[GitHub Issues]
+        A6[News API]
+    end
+
+    subgraph Preprocessing ["2. Zero-Cost Noise Rejection"]
+        B1[HTML Entity Decoding & Normalization]
+        B2[Content Fingerprinting & Deduplication]
+        B3[Negative Filter: Listicles / SEO / Bug Ads]
+        B4[Topic Relevance Thresholding]
+    end
+
+    subgraph Classifiers ["3. Multidimensional NLP Engine"]
+        C1[Intent Detector<br/>Budget / Timeline / Evaluation]
+        C2[Switching Detector<br/>Competitor Migration]
+        C3[Persona NER<br/>C-Suite / VP / Director]
+        C4[Compound Pain Engine<br/>Pricing + Vendor Lock]
+        C5[Sentiment Classifier<br/>AFINN Lexicon]
+    end
+
+    subgraph Scoring ["4. Lead Qualification & Scoring"]
+        D1[Source Multipliers<br/>r/revops 1.5x / G2 1.5x]
+        D2[Recency Exponential Decay]
+        D3[Lead Priority Matrix<br/>URGENT / HIGH / MEDIUM]
+    end
+
+    subgraph Sinks ["5. Output & Delivery Layer"]
+        E1[Apify Datasets]
+        E2[Webhook Batch Dispatcher]
+        E3[Executive Summaries & Alerts]
+    end
+
+    Data Sources --> Preprocessing
+    Preprocessing -->|Accepted Signals| Classifiers
+    Classifiers --> Scoring
+    Scoring --> Sinks
+```
+
+### 🧩 Core Architecture Components
+
+| Pipeline Layer | Component | Key Responsibilities |
+| :--- | :--- | :--- |
+| **1. Scraping Layer** | [`src/scrapers/*`](file:///home/o-hit/apify/dark/src/scrapers) | Scrapes public posts, reviews & search results across Reddit, G2, LinkedIn, HN, GitHub, and News. |
+| **2. Preprocessing** | [`src/utils/normalizer.js`](file:///home/o-hit/apify/dark/src/utils/normalizer.js)<br/>[`src/classifiers/negativeFilter.js`](file:///home/o-hit/apify/dark/src/classifiers/negativeFilter.js) | Drops ~85% of noise (SEO spam, listicles, developer bug reports) at zero cost using regex patterns and content hashes. |
+| **3. NLP Intelligence** | [`src/classifiers/intent.js`](file:///home/o-hit/apify/dark/src/classifiers/intent.js)<br/>[`src/classifiers/switching.js`](file:///home/o-hit/apify/dark/src/classifiers/switching.js)<br/>[`src/classifiers/persona.js`](file:///home/o-hit/apify/dark/src/classifiers/persona.js)<br/>[`src/classifiers/pain.js`](file:///home/o-hit/apify/dark/src/classifiers/pain.js) | Classifies buying stage (Awareness → Evaluation → Decision), detects competitor switching intent, extracts decision-maker job titles, and identifies compound pain points. |
+| **4. Scoring Engine** | [`src/classifiers/leadScorer.js`](file:///home/o-hit/apify/dark/src/classifiers/leadScorer.js) | Computes lead priority (`URGENT`, `HIGH`, `MEDIUM`, `LOW`) using weighted source multipliers, star counts, and exponential recency decay. |
+| **5. Integration Layer** | [`src/pipeline/output.js`](file:///home/o-hit/apify/dark/src/pipeline/output.js)<br/>[`src/classifiers/crm.js`](file:///home/o-hit/apify/dark/src/classifiers/crm.js) | Formats CRM-ready JSON payloads, calculates executive summaries, triggers high-priority alerts, and dispatches batched Webhook notifications. |
+
+---
+
+## 🚀 How It Works: The 4-Stage Hybrid Pipeline
+
+Our engine avoids the fatal flaw of standard web scrapers: *drowning in noise*.
 
 ### 1. Multi-Source Signal Collection
-We optimize strictly for **trustworthy commercial signals**, not generic volume.
-- **LinkedIn Discovery Support**: Captures public buying signals, professional intent, and evaluation requests. Note: This is optimized for discovery of public posts via search engines, not deep authenticated profile extraction.
-- **G2 Reviews**: Uncovers deep dissatisfaction, pricing complaints, and vendor evaluations (via Yahoo Dorking).
-- **Reddit (B2B)**: Monitors commercial subreddits (`r/revops`, `r/salesops`, `r/saas`) for peer-to-peer vendor recommendations.
-- **Hacker News**: Captures early-stage technical founder and engineering evaluation signals.
-- **GitHub**: Monitored to detect technical implementation pains.
+We optimize strictly for **trustworthy commercial signals**, not raw volume.
+- **LinkedIn Discovery**: Captures public buying signals, professional intent, and vendor evaluation requests via search engine discovery.
+- **G2 Reviews**: Uncovers deep dissatisfaction, pricing complaints, and vendor evaluations via Yahoo Dorking.
+- **Reddit (B2B)**: Monitors targeted subreddits (`r/revops`, `r/salesops`, `r/saas`) for peer-to-peer vendor recommendations.
+- **Hacker News**: Captures early-stage technical founder and engineering evaluation signals via Algolia API.
+- **GitHub**: Scans public issues to detect technical implementation pain and migration discussions.
+- **News**: Scans publication feeds for market announcements and corporate moves.
 
 ### 2. Fast Heuristics (Zero-Cost Filtering)
-Rapidly scans for pain keywords, personas, and commercial relevance. Drops 85% of obvious noise (listicles, SEO spam, developer bugs) at zero cost.
+Scans candidate texts for pain keywords, buyer personas, and commercial relevance. Drops 85%+ of noise (listicles, hiring posts, bug reports) before invoking heavier processing.
 
-### 3. Deep Source Weighting
-Applies precise multipliers. A mention in `r/revops` or `G2` is boosted (1.5x), while technical chatter in `r/reactjs` is penalized (0.7x). Also supports GitHub repo star multipliers (1.2x for 1k+ stars, 1.4x for 5k+ stars).
+### 3. Deep Source Weighting & Recency Decay
+Applies domain-specific multipliers:
+- **Source Multipliers**: High-intent forums (`r/revops`, `G2`) get a **1.5x boost**, while generic technical subreddits (`r/reactjs`) are scaled at **0.7x**.
+- **GitHub Multipliers**: Repos with >1k stars receive **1.2x**, >5k stars receive **1.4x**.
+- **Recency Decay**: Exponential decay prioritizes fresh signals (100% at Day 0, ~40% at Day 30, ~7% at Day 90).
 
-### 4. Compound Pain & Recency Decay
-- **Compound Pain Multipliers**: Detects high-value pain combinations (e.g., "pricing + vendor lock" → 1.4x boost).
-- **Recency Decay**: Fresh signals get higher priority (1x for 0 days, ~0.4x for 30 days, ~0.07x for 90 days).
+### 4. Compound Pain & Switch Signal Scoring
+- **Compound Pain Boost**: Detects high-value pain combinations (e.g., `pricing + vendor lock` → **1.4x boost**).
+- **Switch Signal Detection**: Isolates explicit switching statements (e.g., *"moving off Salesforce"*, *"replacing HubSpot"*) to tag SDR leads as `URGENT`.
 
 ---
 
